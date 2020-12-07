@@ -37,7 +37,13 @@ void DrawFreeState();
 void DrawStopState();
 
 private:
-U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C _display;
+
+#ifdef SIXTYFOUR
+    U8G2_SSD1306_128X64_NONAME_F_SW_I2C _display;
+#else
+    U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C _display;
+#endif
+
 int _oldTime;
 int screensafer_x;
 int screensafer_y;

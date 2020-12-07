@@ -15,6 +15,7 @@ UserHandler::UserHandler(int chipSelect, int slaveSelect, int rstPin) : _nfcRead
         SdStatus = false;
         deboundeStatus = false;
         this->User = "";
+        this->_chipPage = 0x0;
 }
 
 void UserHandler::loadConfiguration()
@@ -32,8 +33,10 @@ void UserHandler::loadConfiguration()
         config.ServerOn = doc["ServerOn"] | 0;
         config.SSID = doc["SSID"] | "";
         config.PW = doc["PW"] | "";
+        config.chipPage = doc["ChipPage"] | 1;
 
         Serial.println(config.SSID);
+        Serial.println(config.chipPage );
 
         file.close();
 }
@@ -163,11 +166,17 @@ int UserHandler::ReadCredit()
         byte buffer[18];
         byte byteCount;
         int stat = 0;
+
         byteCount = sizeof(buffer);
 
-        stat = _nfcReader.MIFARE_Read(0x4, buffer, &byteCount);
+        stat = _nfcReader.MIFARE_Read(config.chipPage, buffer, &byteCount);
 
-        if (stat == 0) {
+        int key_AND = (buffer[0] & buffer[1] & buffer[2] & buffer[3]);
+        int key_SUM = ((buffer[0] + buffer[1] + buffer[2] + buffer[3]) / 4);
+
+
+        if (stat == 0 && key_AND == key_SUM)
+        {
                 return (buffer[0] + buffer[1] + buffer[2] + buffer[3]) / 4;
         }
         else
@@ -176,21 +185,19 @@ int UserHandler::ReadCredit()
         }
 }
 
-int UserHandler::WriteCredit(int newCredit,bool doppelt)
+int UserHandler::WriteCredit(int newCredit,bool paymentType)
 {
 
         byte PSWBuff[] = {0xFF, 0xAB, 0xBA, 0xFF};
         byte pACK[] = {0xE, 0x5};
-        long userID = 0;
-        int stat = 0;
+        byte WBuff[] = {newCredit, newCredit, newCredit, newCredit};
+        int _stat = 0;
 
         ReadCredit();
         _nfcReader.PCD_NTAG216_AUTH(&PSWBuff[0], pACK);
+        _stat = _nfcReader.MIFARE_Ultralight_Write(config.chipPage, WBuff, 4); // EE-5 KM CP = 0x04 
 
-        byte WBuff[] = {newCredit, newCredit, newCredit, newCredit};
-        stat = _nfcReader.MIFARE_Ultralight_Write(0x4, WBuff, 4);
-
-        if (stat != 0)
+        if (_stat != 0)
         {
                 return -1;
         }
@@ -210,7 +217,7 @@ int UserHandler::WriteCredit(int newCredit,bool doppelt)
         Serial.println("########");
         Serial.println(UserTxT);
         String CreditTxT = String(newCredit,DEC);
-        this->WriteToLog(UserTxT.c_str(), CreditTxT.c_str(),doppelt);
+        this->WriteToLog(UserTxT.c_str(), CreditTxT.c_str(),paymentType);
         return 0;
 }
 
@@ -268,6 +275,7 @@ bool UserHandler::saveConfiguration(int tiSingle, int tiDobule) {
         doc["ServerOn"] = config.ServerOn;
         doc["SSID"] = config.SSID;
         doc["PW"] = config.PW;
+        doc["ChipPage"] = config.chipPage;
 
 
         if (serializeJson(doc, file) == 0) {

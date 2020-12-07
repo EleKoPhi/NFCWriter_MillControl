@@ -1,3 +1,8 @@
+// COMPILER DEFINES 
+
+#define DEBUG
+
+
 // PIN DEFINES
 
 #define taster_LINKS_pin 7
@@ -9,12 +14,9 @@
 #define sd_CS_pin 4
 #define RelayPin 5
 
-// WEB SERVER DEFINES
-
-#define SECRET_SSID "Werners Kaffeestube"
-#define SECRET_PASS "Werner"
 
 // STATES
+
 enum MillStates
 {
 	WaitForCard         = 0,
@@ -34,22 +36,19 @@ enum MillStates
 	SceenSaferState     = 23,
 	LstUserState        = 24,
 	HoldState_2         = 25,
-	FreePullState 			= 26,
-	StopState						= 27,
-	FinishState  				= 28,
+	FreePullState 		= 26,
+	StopState			= 27,
+	FinishState  	    = 28,
 
 
-  WaitForUser         = 11,
-  PayOne              = 12,
-  SplitPaymentQ       = 13,
-  PayTwo              = 14,
-  ShowCredit          = 15,
-  PayTwo_1            = 16,
-  PayTwo_2            = 17,
-  LowCredit           = 18,
-  ReadCreditUser      = 19,
-
+  	WaitForUser         = 11,
+  	PayOne              = 12,
+  	SplitPaymentQ       = 13,
+  	PayTwo              = 14,
+  	ShowCredit          = 15,
+  	PayTwo_1            = 16,
+  	PayTwo_2            = 17,
+  	LowCredit           = 18,
+  	ReadCreditUser      = 19
 
 };
-
-#define DEBUG

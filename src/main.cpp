@@ -7,8 +7,8 @@ Controller MillController(sd_CS_pin, nfc_SS_pin, nfc_RS_pin,display_CLK_pin, dis
 void setup()
 {
 
-        //Serial.begin(9600);
-        //while(!Serial) {}
+        Serial.begin(9600);
+        while(!Serial) {}
 
         MillController.Begin();
 

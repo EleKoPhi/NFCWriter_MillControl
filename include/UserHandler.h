@@ -21,6 +21,7 @@ struct Config {
         int ServerOn;
         String SSID;
         String PW;
+        int chipPage;
 };
 Config config;
 
@@ -52,6 +53,7 @@ File _userData;
 File _logFile;
 RTC_DS3231 _rtc;
 int _cspin;
+int _chipPage;
 
 bool deboundeStatus;
 
