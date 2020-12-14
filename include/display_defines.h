@@ -2,6 +2,8 @@
     #define TARGETFLIPMODE      1
 
     #define SAFTERINITIALSIZE   5
+    #define UPDATETIME          1000
+    #define STEPSIZE            4
 
     #define STARTANIMATION      0 
 

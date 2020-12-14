@@ -36,6 +36,22 @@ void Err();
 void DrawFreeState();
 void DrawStopState();
 
+int GetScreensaverSize();
+void SetScreensaverSize(int Size);
+int GetScreensaverX();
+void SetScreensaverX(int Size);
+int GetScreensaverY();
+void SetScreensaverY(int Size);
+int GetOldTime();
+void SetOldTime(int time);
+
+#ifdef SIXTYFOUR
+    U8G2_SSD1306_128X64_NONAME_F_SW_I2C &GetDisplay();
+#else
+    U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C &GetDisplay();
+#endif
+
+
 private:
 
 #ifdef SIXTYFOUR

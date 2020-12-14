@@ -9,7 +9,6 @@
 #include "RTClib.h"
 
 
-
 class UserHandler
 {
 public:
@@ -25,37 +24,58 @@ struct Config {
 };
 Config config;
 
-const char *filename = "config.json";
-
 String CheckIfExists(String cardID);
-void StartUp();
+void begin();
 char ReadUserInput();
 bool HasCardToRead();
 String GetCardId();
-String GetMoment();
+String GetTimeStamp();
 void WriteToLog(String userID, String credit,bool doppelt);
 int ReadCredit();
 int WriteCredit(int newCredit,bool doppelt);
 String ID();
 void newRead();
-String getLastUser();
+
 void loadConfiguration();
 bool saveConfiguration(int tiSingle, int tiDobule);
 
-bool SdStatus;
-bool NfcStatus;
-bool RtcStatus;
-String User;
+////////////// GETTER AND SETTER BEGIN /////////////////
+
+bool &GetSDStatus();
+void SetSDStatus(bool Status);
+bool &GetRTCStatus();
+void SetRTCStatus(bool Status);
+bool &GetNFCStatus();
+void SetNFCStatus(bool Status);
+
+String getLastUser();
+
+String &GetUser();
+void SetUser(String user);
+
+void SetChipSelectSD(int PIN);
+int &GetChipSelectSD();;
+
+MFRC522 &GetNFCReader();
+RTC_DS3231 &GetRTC();
+
+File &GetLogFile();
+void SetLogFile(File filename);
+
+////////////// GETTER AND SETTER END ///////////////////
 
 private:
-MFRC522 _nfcReader;
+
 File _userData;
 File _logFile;
 RTC_DS3231 _rtc;
-int _cspin;
-int _chipPage;
+MFRC522 _nfcReader;
+String User;
 
-bool deboundeStatus;
+int ChipSelect_SD;
+bool SdStatus;
+bool NfcStatus;
+bool RtcStatus;
 
 };
 

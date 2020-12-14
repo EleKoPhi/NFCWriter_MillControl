@@ -3,39 +3,54 @@
 #include <U8g2lib.h>
 #include "display_defines.h"
 
+#ifdef SIXTYFOUR
+    U8G2_SSD1306_128X64_NONAME_F_SW_I2C &Drawer::GetDisplay(){return _display;}
+#else
+    U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C &Drawer::GetDisplay(){return _display;}
+#endif
+
 Drawer::Drawer(int clk, int data) : _display(U8G2_R0, clk, data, U8X8_PIN_NONE)
 {
-        _display.begin();
-        _display.setFlipMode(TARGETFLIPMODE);
-        this->screensafer_x = _display.getWidth()/2;
-        this->screensafer_y = _display.getHeight()/2;
-        this->size = SAFTERINITIALSIZE;
+        GetDisplay().begin();
+        GetDisplay().setFlipMode(TARGETFLIPMODE);
+        SetScreensaverX(GetDisplay().getWidth()/2);
+        SetScreensaverY(GetDisplay().getHeight()/2);
+        SetScreensaverSize(SAFTERINITIALSIZE);
 }
+
+int Drawer::GetScreensaverSize(){return size;}
+void Drawer::SetScreensaverSize(int Size){size = Size;}
+int Drawer::GetScreensaverX(){return screensafer_x;}
+void Drawer::SetScreensaverX(int X){screensafer_x = X;}
+int Drawer::GetScreensaverY(){return screensafer_y;}
+void Drawer::SetScreensaverY(int Y){screensafer_y = Y;}
+int Drawer::GetOldTime(){return _oldTime;}
+void Drawer::SetOldTime(int time){_oldTime = time;}
 
 void Drawer::Clear()
 {
-        _display.clearBuffer();
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawCenter(String txt, int y)
 {
-        char pos = (_display.getWidth() - _display.getStrWidth(txt.c_str()))/2;
-        _display.drawStr(pos, y, txt.c_str());
+        char _pos = (GetDisplay().getWidth() - GetDisplay().getStrWidth(txt.c_str()))/2;
+        GetDisplay().drawStr(_pos, y, txt.c_str());
 }
 
 void Drawer::DrawScreenSafer(int time)
 {
-        _display.clearBuffer();
-        if (time-this->_oldTime>1000)
+        GetDisplay().clearBuffer();
+        if (time-GetOldTime()>UPDATETIME)
         {
-                this->size = random(0,_display.getHeight()/2-1);
-                this->screensafer_x = random(this->size, _display.getWidth()-this->size);
-                this->screensafer_y = random(this->size, _display.getHeight()-this->size);
-                this->_oldTime = time;
+                SetScreensaverSize(random(0,GetDisplay().getHeight()/2-1));
+                SetScreensaverX(random(GetScreensaverSize(), GetDisplay().getWidth()-GetScreensaverSize()));
+                SetScreensaverY(random(GetScreensaverSize(), GetDisplay().getHeight()-GetScreensaverSize()));
+                SetOldTime(time);
         }
-        _display.drawCircle(this->screensafer_x, this->screensafer_y,this->size);
-        _display.sendBuffer();
+        GetDisplay().drawCircle(GetScreensaverX(), GetScreensaverY(), GetScreensaverSize());
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawMain()
@@ -43,223 +58,224 @@ void Drawer::DrawMain()
         
         int pos = 0;
 
-        while(pos <= 64 && STARTANIMATION)
+        while(pos <= GetDisplay().getWidth() && STARTANIMATION)
         {
-                _display.clearBuffer();
-                _display.setFont(KMNEXT_font);
-                _display.setDrawColor(1);
-                this->DrawCenter(KMNEXT_txt, KMNEXT_y);
-                _display.setDrawColor(0);
-                _display.drawBox(0,0,64-pos,32);
-                _display.drawBox(64+pos,0,64-pos,32);
-                _display.sendBuffer();
-                _display.setDrawColor(1);
-                pos = pos + 4;
+                GetDisplay().clearBuffer();
+                GetDisplay().setFont(KMNEXT_font);
+                GetDisplay().setDrawColor(1);
+                DrawCenter(KMNEXT_txt, KMNEXT_y);
+                GetDisplay().setDrawColor(0);
+                GetDisplay().drawBox(0,0,GetDisplay().getWidth()-pos,GetDisplay().getWidth()/2);
+                GetDisplay().drawBox(GetDisplay().getWidth()+pos,0,GetDisplay().getWidth()-pos,GetDisplay().getWidth()/2);
+                GetDisplay().sendBuffer();
+                GetDisplay().setDrawColor(1);
+                pos = pos + STEPSIZE;
         }
-        while(pos > 0) {pos = pos - 4;}
+        while(pos > 0) {pos = pos - STEPSIZE;}
 }
 
 void Drawer::DrawErr(bool sdStatus, bool nfcStatus, bool rtcStatus)
 {
-        _display.clearBuffer();
-        _display.setFont(STATE_font);
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(STATE_font);
 
         if (!sdStatus)
         {
-                this->DrawCenter(SDERROR_txt, SDSTATE_y);
+                DrawCenter(SDERROR_txt, SDSTATE_y);
         }
         else
         {
-                this->DrawCenter(SDOK_txt, SDSTATE_y);
+                DrawCenter(SDOK_txt, SDSTATE_y);
         }
 
         if (!nfcStatus)
         {
-                this->DrawCenter(NFCERROR_txt, NFCSTATE_y);
+                DrawCenter(NFCERROR_txt, NFCSTATE_y);
         }
         else
         {
-                this->DrawCenter(NFCOK_txt, NFCSTATE_y);
+                DrawCenter(NFCOK_txt, NFCSTATE_y);
         }
         if (!rtcStatus)
         {
-                this->DrawCenter(RTCERROR_txt, RTCSTATE_y);
+                DrawCenter(RTCERROR_txt, RTCSTATE_y);
         }
         else
         {
-                this->DrawCenter(RTCOK_txt, RTCSTATE_y);
+                DrawCenter(RTCOK_txt, RTCSTATE_y);
         }
 
         if (!sdStatus |!nfcStatus | !rtcStatus)
         {
-                _display.sendBuffer();
+                GetDisplay().sendBuffer();
                 while (true);
+
         }
 }
 
 void Drawer::DrawLastUser(String lastUser)
 {
-        _display.clearBuffer();
-        _display.setFont(LASTID_font);
-        this->DrawCenter(LASTID_txt, LASTID_y);
-        _display.setFont(LASTID_value_font);
-        this->DrawCenter(lastUser, LASTID_value_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(LASTID_font);
+        DrawCenter(LASTID_txt, LASTID_y);
+        GetDisplay().setFont(LASTID_value_font);
+        DrawCenter(lastUser, LASTID_value_y);
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DisplayProgress(int progress)
 {
 
-        _display.clearBuffer();
-        _display.setFont(ZUBEREITUNG_font);
-        this->DrawCenter(ZUBEREITUNG_txt,ZUBEREITUNG_y);
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(ZUBEREITUNG_font);
+        DrawCenter(ZUBEREITUNG_txt,ZUBEREITUNG_y);
 
         for(int i=0; i<=progress/PROGRESS_division; i++)
         {
-                _display.drawBox(i*13+1, PROGRESS_y, PROGRESS_width, PROGRESS_height);
+                GetDisplay().drawBox(i*13+1, PROGRESS_y, PROGRESS_width, PROGRESS_height);
         }
-        _display.sendBuffer();
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawUnknown()
 {
-        _display.clearBuffer();
-        _display.setFont(UNKNOWNID_font);
-        this->DrawCenter(UNKNOWNIDFILL_txt,UNKNOWNIDFILL_y1);
-        this->DrawCenter(UNKNOWNID_txt,UNKNOWNID_y);
-        this->DrawCenter(UNKNOWNIDFILL_txt,UNKNOWNIDFILL_y2);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(UNKNOWNID_font);
+        DrawCenter(UNKNOWNIDFILL_txt,UNKNOWNIDFILL_y1);
+        DrawCenter(UNKNOWNID_txt,UNKNOWNID_y);
+        DrawCenter(UNKNOWNIDFILL_txt,UNKNOWNIDFILL_y2);
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawWaitForUser()
 {
-        _display.clearBuffer();
-        _display.setFont(BITTEWAEHLEN_font);
-        this->DrawCenter(BITTEWAEHLEN_txt, BITTEWAEHLEN_y);
-        _display.setFont(ARROWS_font);
-        this->DrawCenter(ARROWS_txt, ARROWS_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(BITTEWAEHLEN_font);
+        DrawCenter(BITTEWAEHLEN_txt, BITTEWAEHLEN_y);
+        GetDisplay().setFont(ARROWS_font);
+        DrawCenter(ARROWS_txt, ARROWS_y);
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawPayOne()
 {
-        _display.clearBuffer();
-        _display.setFont(PAYONE_font);
-        this->DrawCenter(PAYONE_txt, PAYONE_y);
-        _display.setFont(ADDCARD_font);
-        this->DrawCenter(ADDCARD_txt, ADDCARD_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(PAYONE_font);
+        DrawCenter(PAYONE_txt, PAYONE_y);
+        GetDisplay().setFont(ADDCARD_font);
+        DrawCenter(ADDCARD_txt, ADDCARD_y);
+        GetDisplay().sendBuffer();
 
 }
 
 void Drawer::DrawSplitQ2()
 {
-        _display.clearBuffer();
-        _display.setFont(SPLITQ_font);
-        this->DrawCenter(SPLITQ_txt, SPLITQ_y);
-        _display.setFont(SPLITQARRWOS_font);
-        this->DrawCenter(SPLITQARROWS_txt, SPLITQARROWS_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(SPLITQ_font);
+        DrawCenter(SPLITQ_txt, SPLITQ_y);
+        GetDisplay().setFont(SPLITQARRWOS_font);
+        DrawCenter(SPLITQARROWS_txt, SPLITQARROWS_y);
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawPay2 ()
 {
-        _display.clearBuffer();
-        _display.setFont(PAY2_font);
-        this->DrawCenter(PAY2_txt, PAY2_y);
-        _display.setFont(ADDCARD_font);
-        this->DrawCenter(ADDCARD_txt, ADDCARD_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(PAY2_font);
+        DrawCenter(PAY2_txt, PAY2_y);
+        GetDisplay().setFont(ADDCARD_font);
+        DrawCenter(ADDCARD_txt, ADDCARD_y);
+        GetDisplay().sendBuffer();
 
 }
 
 void Drawer::DrawPay2_1()
 {
-        _display.clearBuffer();
-        _display.setFont(PAY2_1_font);
-        this->DrawCenter(PAY2_1_txt, PAY2_1_y);
-        _display.setFont(ADD1CARD_font);
-        this->DrawCenter(ADD1CARD_y, ADD1CARD_txt);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(PAY2_1_font);
+        DrawCenter(PAY2_1_txt, PAY2_1_y);
+        GetDisplay().setFont(ADD1CARD_font);
+        DrawCenter(ADD1CARD_y, ADD1CARD_txt);
+        GetDisplay().sendBuffer();
 
 }
 
 void Drawer::DrawPay2_2()
 {
-        _display.clearBuffer();
-        _display.setFont(PAY2_2_font);
-        this->DrawCenter(PAY2_2_txt, PAY2_2_y);
-        _display.setFont(ADD2CARD_font);
-        this->DrawCenter(ADD2CARD_txt, ADD2CARD_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(PAY2_2_font);
+        DrawCenter(PAY2_2_txt, PAY2_2_y);
+        GetDisplay().setFont(ADD2CARD_font);
+        DrawCenter(ADD2CARD_txt, ADD2CARD_y);
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawLowCredit()
 {
-        _display.clearBuffer();
-        _display.setFont(LOWCREDIT1_font);
-        this->DrawCenter(LOWCREDIT1_txt, LOWCREDIT1_y);
-        _display.setFont(LOWCREDIT2_font);
-        this->DrawCenter(LOWCREDIT2_txt, LOWCREDIT2_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(LOWCREDIT1_font);
+        DrawCenter(LOWCREDIT1_txt, LOWCREDIT1_y);
+        GetDisplay().setFont(LOWCREDIT2_font);
+        DrawCenter(LOWCREDIT2_txt, LOWCREDIT2_y);
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawReplay(int progress)
 {
-        _display.clearBuffer();
-        _display.setFont(REPAY1_font);
-        this->DrawCenter(REPAY1_txt, REPAY1_y);
-        _display.setFont(REPAY2_font);
-        this->DrawCenter(REPAY2_txt, REPAY2_y);
-        _display.drawLine(0,_display.getHeight()/2+1, _display.getWidth()*((progress)*0.01),_display.getHeight()/2+1);
-        _display.drawLine(_display.getWidth(),_display.getHeight()/2-1, (_display.getWidth()-_display.getWidth()*((progress)*0.01)),_display.getHeight()/2-1);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(REPAY1_font);
+        DrawCenter(REPAY1_txt, REPAY1_y);
+        GetDisplay().setFont(REPAY2_font);
+        DrawCenter(REPAY2_txt, REPAY2_y);
+        GetDisplay().drawLine(0,GetDisplay().getHeight()/2+1, GetDisplay().getWidth()*((progress)*0.01),GetDisplay().getHeight()/2+1);
+        GetDisplay().drawLine(GetDisplay().getWidth(),GetDisplay().getHeight()/2-1, (GetDisplay().getWidth()-GetDisplay().getWidth()*((progress)*0.01)),GetDisplay().getHeight()/2-1);
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawCredit(int ID, int Credit)
 {
-        String IDs = ID_txt + String(ID);
-        String Cred = CREDITS_txt + String(Credit);
+        String _id = ID_txt + String(ID);
+        String _credit = CREDITS_txt + String(Credit);
 
-        _display.clearBuffer();
-        _display.setFont(ID_font);
-        this->DrawCenter(IDs, ID_y);
-        _display.setFont(CREDITS_font);
-        this->DrawCenter(Cred, CREDITS_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(ID_font);
+        DrawCenter(_id, ID_y);
+        GetDisplay().setFont(CREDITS_font);
+        DrawCenter(_credit, CREDITS_y);
+        GetDisplay().sendBuffer();
 
 }
 
 void Drawer::DrawDoneState()
 {
-        _display.clearBuffer();
-        _display.setFont(DONE_font);
-        this->DrawCenter(DONE_txt, DONE_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(DONE_font);
+        DrawCenter(DONE_txt, DONE_y);
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::Drawer::Err()
 {
-        _display.clearBuffer();
-        _display.setFont(ERR_font);
-        this->DrawCenter(ERR_txt, ERR_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(ERR_font);
+        DrawCenter(ERR_txt, ERR_y);
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawFreeState()
 {
-        _display.clearBuffer();
-        _display.setFont(FREE_font);
-        this->DrawCenter(FREE1_txt, FREE1_y);
-        this->DrawCenter(FREE2_txt, FREE2_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(FREE_font);
+        DrawCenter(FREE1_txt, FREE1_y);
+        DrawCenter(FREE2_txt, FREE2_y);
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawStopState()
 {
-        _display.clearBuffer();
-        _display.setFont(STOP_font);
-        this->DrawCenter(STOP1_txt, STOP1_y);
-        this->DrawCenter(STOP2_txt, STOP2_y);
-        _display.sendBuffer();
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(STOP_font);
+        DrawCenter(STOP1_txt, STOP1_y);
+        DrawCenter(STOP2_txt, STOP2_y);
+        GetDisplay().sendBuffer();
 }

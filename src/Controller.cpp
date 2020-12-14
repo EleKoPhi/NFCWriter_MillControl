@@ -7,361 +7,230 @@
 #include <WiFi101.h>
 #include <SPI.h>
 
-WiFiServer server(80);
-WiFiClient client;
+Controller ::Controller(int chipSelect, int slaveSelect, int rstPin, int clk, int data) : _drawer(clk, data), _userHandler(chipSelect, slaveSelect, rstPin) {}
 
-Controller :: Controller(int chipSelect, int slaveSelect, int rstPin, int clk, int data) : _drawer(clk, data), _userHandler(chipSelect, slaveSelect, rstPin) {
-}
+//////////////////  Getter and Setter for all variables  ////////////////////////////
+
+void Controller::SetCurrentStatus(char stat) { _currentStatus = stat; }
+char &Controller::GetCurrentStatus() { return _currentStatus; }
+
+void Controller::SetCurrentKeyFlag(char key) { this->key = key; }
+char &Controller::GetCurrentKeyFlag() { return this->key; }
+
+void Controller::SetOldKeyFlag(char key) { this->oldKey = key; }
+char &Controller::GetOldKeyFlag() { return this->oldKey; }
+
+void Controller::SetStartTime(unsigned long time) { this->_startTime = time; }
+unsigned long &Controller::GetStartTime() { return this->_startTime; }
+
+void Controller::SetTimeSingle(unsigned long time) { this->T_einfach = time; }
+unsigned long &Controller::GetTimeSingle() { return this->T_einfach; }
+
+void Controller::SetTimeDouble(unsigned long time) { this->T_doppelt = time; }
+unsigned long &Controller::GetTimeDouble() { return this->T_doppelt; }
+
+void Controller::SetTimeRemaning(unsigned long time) { this->T_rest = time; }
+unsigned long &Controller::GetTimeRemaning() { return this->T_rest; }
+
+void Controller::SetTimePassed(unsigned long time) { this->_passedtime = time; }
+unsigned long &Controller::GetTimePassed() { return this->_passedtime; }
+
+void Controller::SetTimeDelta(unsigned long time) { this->_deltaTime = time; }
+unsigned long &Controller::GetTimeDelta() { return this->_deltaTime; }
+
+void Controller::SetTimeStopBegin(unsigned long time) { this->_stopBegin = time; }
+unsigned long &Controller::GetTimeStopBegin() { return this->_stopBegin; }
+
+void Controller::SetTimeInStop(unsigned long time) { this->_timeInStopState = time; }
+unsigned long &Controller::GetTimeInStop() { return this->_timeInStopState; }
+
+void Controller::SetCurrentUser(String userID) { this->_currentUser = userID; }
+String &Controller::GetCurrentUser() { return this->_currentUser; }
+
+UserHandler &Controller::GetUserHandler() { return this->_userHandler; }
+Drawer &Controller::GetDrawer(){return this->_drawer;}
+
+int &Controller::GetUserAsInt(){ return this->credit;}
+void Controller::SetUserAsInt(int credit){this->credit = credit;}
+
+int &Controller::GetCreditAsInt(){return this->user;}
+void Controller::SetCreditAsInt(int user){this->user = user;}
+
+/////////////////////////////////////////////////////////////////////////////////
 
 void Controller::Begin()
 {
-        _userHandler.StartUp();
-        _drawer.DrawErr(_userHandler.SdStatus, _userHandler.NfcStatus, _userHandler.RtcStatus);
-        _drawer.DrawMain();
-        this->Reset();
-        pinMode(5, OUTPUT);
-        this->MillOff();
+        // Initialize all variables with default values
+        Reset();
 
-        this->LastUser = "";
+        // Setup RelayPin as OUTPUT, this pin controlles the basis of the transistor
+        pinMode(RelayPin, OUTPUT);
 
-        this->T_einfach = this->_userHandler.config.single_time;
-        this->T_doppelt = this->_userHandler.config.double_time;
+        // Make sure the mill if off
+        MillOff();
 
+        // Initialize the user handler for for NFC, SD and RTC functionallity
+        GetUserHandler().begin();
 
-        if (this->_userHandler.config.ServerOn)
-        {
-                if (WiFi.status() == WL_NO_SHIELD) {
-                        Serial.println("WiFi shield not present");
-                        // don't continue
-                        while (true);
-                }
+        //Read time for singe and double from config file
+        SetTimeSingle(GetUserHandler().config.single_time);
+        SetTimeDouble(GetUserHandler().config.double_time);
 
-                Serial.println("WiFi shield present");
-                String SSID = this->_userHandler.config.SSID;
-                String PW = this->_userHandler.config.PW;
-                status = WiFi.beginAP(SSID.c_str(),PW.c_str());
-                server.begin();
-                IPAddress ip =WiFi.localIP();
-                Serial.println(ip);
-        }
+        // If there is a problem with NFC, SD or RTC, display the error states
+        GetDrawer().DrawErr(GetUserHandler().GetSDStatus(), GetUserHandler().GetNFCStatus(), GetUserHandler().GetRTCStatus());
 
-        this->StateBegin(WaitForUser);
-
-}
-
-void Controller::PutCurrentStatus(char stat)
-{
-        _currentStatus = stat;
-}
-
-char Controller::GetCurrentStatus()
-{
-        return _currentStatus;
+        // Draw the startup animation
+        GetDrawer().DrawMain();
 }
 
 char Controller::StateTransitions()
 {
-        this->oldKey = this->key;
-        this->key =  _userHandler.ReadUserInput();
-        client = server.available();
+        SetOldKeyFlag(GetCurrentKeyFlag());
+        SetCurrentKeyFlag(GetUserHandler().ReadUserInput());
 
-        if (((key == 'l') | (key == 'r') && (key == this->oldKey)))
+        if (((GetCurrentKeyFlag() == LEFT_KEY) || (GetCurrentKeyFlag() == RIGHT_KEY)) && (GetCurrentKeyFlag() == GetOldKeyFlag()))
         {
-                return _currentStatus;
+                return GetCurrentStatus();
         }
 
-        if (((_currentStatus == WaitForUser) | (_currentStatus == ShowCredit) | (_currentStatus == SceenSaferState)) && key == 'l')
+        if (((GetCurrentStatus() == WaitForUser) || (GetCurrentStatus() == ShowCredit) || (GetCurrentStatus() == SceenSaferState)) && (GetCurrentKeyFlag() == LEFT_KEY))
         {
-                if (_currentStatus == SceenSaferState) _startTime = millis();
+                if (GetCurrentStatus() == SceenSaferState)
+                        SetStartTime(millis());
                 return StateBegin(PayOne);
         }
 
-        else if (((_currentStatus == Einfach) | (_currentStatus == Doppelt) | (_currentStatus == FinishState)) && ((key == 'l') | (key == 'r')))
+        else if (((GetCurrentStatus() == Einfach) || (GetCurrentStatus() == Doppelt) || (GetCurrentStatus() == FinishState)) && ((GetCurrentKeyFlag() == LEFT_KEY) || (GetCurrentKeyFlag() == RIGHT_KEY)))
         {
 
-                if (_currentStatus == Einfach)
-                {T_rest = T_einfach;}
-
-                else if (_currentStatus == Doppelt)
-                {T_rest = T_doppelt;}
-
-                else if (_currentStatus == FinishState)
-                {_passedtime = _deltaTime + _passedtime;}
-
-                if (_currentStatus != FinishState)
+                if (GetCurrentStatus() == Einfach)
                 {
-                        _passedtime = _deltaTime;
+                        SetTimeRemaning(GetTimeSingle());
                 }
-                _stopBegin = millis();
-                _timeInStopState = 0;
+                else if (GetCurrentStatus() == Doppelt)
+                {
+                        SetTimeRemaning(GetTimeDouble());
+                }
+                else if (GetCurrentStatus() == FinishState)
+                {
+                        SetTimePassed(GetTimeDelta() + GetTimePassed());
+                }
+
+                if (GetCurrentStatus() != FinishState)
+                {
+                        SetTimePassed(GetTimeDelta());
+                }
+                SetTimeStopBegin(millis());
+                SetTimeInStop(0);
                 return StateBegin(StopState);
         }
 
-        else if ((_currentStatus == StopState) && key == 'l')
+        else if ((GetCurrentStatus() == StopState) && (GetCurrentKeyFlag() == LEFT_KEY))
         {
-                _timeInStopState = 0;
-                _stopBegin = 0;
+                SetTimeInStop(0);
+                SetTimeStopBegin(0);
                 return StateBegin(WaitForUser);
         }
-        else if ((_currentStatus == StopState) && key == 'r')
+        else if ((GetCurrentStatus() == StopState) && GetCurrentKeyFlag() == RIGHT_KEY)
         {
-                Serial.println("Test");
                 return StateBegin(FinishState);
         }
 
-
-        else if ((_currentStatus == FreePullState) && key == 'l')
+        else if (GetCurrentStatus() == FreePullState)
         {
-                return StateBegin(Einfach);
+                if (GetCurrentKeyFlag() == LEFT_KEY) return StateBegin(Einfach);
+                else if (GetCurrentKeyFlag() == RIGHT_KEY) return StateBegin(Doppelt);
+                else return GetCurrentStatus();
         }
 
-        else if ((_currentStatus == FreePullState) && key == 'r')
+        else if (((GetCurrentStatus() == WaitForUser) || (GetCurrentStatus() == ShowCredit) || (GetCurrentStatus() == SceenSaferState)) && (GetCurrentKeyFlag() == BOTH_KEY))
         {
-                return StateBegin(Doppelt);
+                if (GetCurrentStatus() == SceenSaferState)
+                        SetStartTime(millis());
+                return StateBegin(ShowLastUser);
         }
 
-        else if ((_currentStatus == WaitForUser  | _currentStatus == ShowCredit | _currentStatus == SceenSaferState) && key == 'b')
+        else if ((GetCurrentStatus() == LstUserState) && ((GetCurrentKeyFlag() == LEFT_KEY) || (GetCurrentKeyFlag() == RIGHT_KEY)))
         {
-                if (_currentStatus == SceenSaferState) _startTime = millis();
-                return StateBegin(LstUserState);
-        }
-
-        else if (_currentStatus == WaitForUser && client)
-        {
-                if (client)
-                {
-                        Serial.println("new client");
-                        String currentLine = "";
-                        while (client.connected())
-                        {
-                                //Serial.println(millis());
-                                if (client.available())
-                                {
-                                        char c = client.read();
-                                        Serial.write(c);
-                                        if (c == '\n')
-                                        {
-
-                                                if (currentLine.length() == 0)
-                                                {
-
-                                                        client.println("HTTP/1.1 200 OK");
-                                                        client.println("Content-type:text/html");
-                                                        client.println();
-
-                                                        client.print("<!doctype html> <html lang=\"en\"> <head> <style> .column { box-sizing: inherit; display: inline-block; margin-bottom: 0em; margin-top: 0em; vertical-align: middle; width: 100%; } .margin-top { margin-top: 1.6rem; } .centered { box-sizing: inherit; text-align: center; } .btn { -webkit-tap-highlight-color: transparent; background-color: #00bd9a; border-radius: 10px; box-shadow: rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px, rgba(0, 0, 0, 0.2) 0px 3px 1px -2px; box-sizing: inherit; color: white; cursor: pointer; display: inline-block; height: 200px; letter-spacing: 3px; line-height: 200px; padding: 0px 1rem; pointer-events: all; position: relative; text-decoration-line: none; text-transform: uppercase; vertical-align: middle; width: 80%; font-size: 30px; } </style> <meta charset=\"utf-8\"> <meta name=\"Homepage\" content=\"Starting page for the survey website \"> <title> Survey HomePage</title> </head> <body> <div class=\"column\"> <div class=\"margin-top centered\"> <a class=\"btn\" href=\"/S\" style=\"\"> Einfacher Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"D\" style=\"\"> Doppelter Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"V\" style=\"\"> Freibezug </a> </div> </body> </html>");
-
-                                                        client.println();
-
-                                                        break;
-                                                }
-                                                else
-                                                {       if (currentLine.lastIndexOf("action_page.php") != -1)
-                                                        {
-                                                                String SingleKey = "fsingle=";
-                                                                String DoubleKey = "&ldouble=";
-                                                                String EndKEy = " HTTP/1.1";
-                                                                int s = currentLine.lastIndexOf(SingleKey);
-                                                                int d = currentLine.lastIndexOf(DoubleKey);
-                                                                int e = currentLine.lastIndexOf(EndKEy);
-                                                                int Single_from_web = currentLine.substring(s+SingleKey.length(), d).toInt();
-                                                                int Double_from_web = currentLine.substring(d+DoubleKey.length(), e).toInt();
-
-                                                                if (_userHandler.saveConfiguration(Single_from_web, Double_from_web))
-                                                                {
-                                                                        this->T_einfach = Single_from_web;
-                                                                        this->T_doppelt = Double_from_web;
-
-                                                                        client.println("HTTP/1.1 200 OK");
-                                                                        client.println("Content-type:text/html");
-                                                                        client.println();
-
-                                                                        String html_side = "<!doctype html> <html lang=\"en\"> <head> <style> .column { box-sizing: inherit; display: inline-block; margin-bottom: 0em; margin-top: 0em; vertical-align: middle; width: 100%; } .margin-top { margin-top: 1.6rem; } .centered { box-sizing: inherit; text-align: center; } .btn { -webkit-tap-highlight-color: transparent; background-color: #00bd9a; border-radius: 10px; box-shadow: rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px, rgba(0, 0, 0, 0.2) 0px 3px 1px -2px; box-sizing: inherit; color: white; cursor: pointer; display: inline-block; height: 200px; letter-spacing: 3px; line-height: 200px; padding: 0px 1rem; pointer-events: all; position: relative; text-decoration-line: none; text-transform: uppercase; vertical-align: middle; width: 80%; font-size: 30px; } </style> <meta charset=\"utf-8\"> <meta name=\"Homepage\" content=\"Starting page for the survey website \"> <title> Survey HomePage</title> </head> <body> <div class=\"column\"> <div class=\"margin-top centered\"> <a class=\"btn\" href=\"/S\" style=\"\"> $single$ </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"D\" style=\"\"> $double$ </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"V\" style=\"\"> Freibezug </a> </div> </body> </html>";
-
-                                                                        html_side.replace("$single$",String(this->T_einfach));
-                                                                        html_side.replace("$double$",String(this->T_doppelt));
-
-                                                                        client.print(html_side);
-
-                                                                        client.println();
-                                                                        client.flush();
-                                                                        client.stop();
-                                                                }
-                                                                else
-                                                                {
-
-                                                                        client.println("HTTP/1.1 200 OK");
-                                                                        client.println("Content-type:text/html");
-                                                                        client.println();
-
-                                                                        String html_side = "<!doctype html> <html lang=\"en\"> <head> <style> .column { box-sizing: inherit; display: inline-block; margin-bottom: 0em; margin-top: 0em; vertical-align: middle; width: 100%; } .margin-top { margin-top: 1.6rem; } .centered { box-sizing: inherit; text-align: center; } .btn { -webkit-tap-highlight-color: transparent; background-color: #00bd9a; border-radius: 10px; box-shadow: rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px, rgba(0, 0, 0, 0.2) 0px 3px 1px -2px; box-sizing: inherit; color: white; cursor: pointer; display: inline-block; height: 200px; letter-spacing: 3px; line-height: 200px; padding: 0px 1rem; pointer-events: all; position: relative; text-decoration-line: none; text-transform: uppercase; vertical-align: middle; width: 80%; font-size: 30px; } </style> <meta charset=\"utf-8\"> <meta name=\"Homepage\" content=\"Km next\"> <title> Survey HomePage</title> </head> <body> <div class=\"column\"> <div class=\"margin-top centered\"> <a class=\"btn\" href=\"/S\" style=\"\"> Einfacher Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"D\" style=\"\"> Doppelter Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"V\" style=\"\"> Freibezug </a> </div> </body> </html>";
-
-                                                                        client.print(html_side);
-
-                                                                        client.println();
-                                                                        client.flush();
-                                                                        client.stop();
-                                                                }
-
-
-                                                        }
-                                                        currentLine = "";}
-                                        }
-                                        else if (c != '\r')
-                                        {
-                                                currentLine += c;
-
-                                        }
-
-                                        if (currentLine.endsWith("GET /S"))
-                                        {
-                                                client.println("HTTP/1.1 200 OK");
-                                                client.println("Content-type:text/html");
-                                                client.println();
-
-                                                client.print("<!doctype html> <html lang=\"en\"> <head> <style> .column { box-sizing: inherit; display: inline-block; margin-bottom: 0em; margin-top: 0em; vertical-align: middle; width: 100%; } .margin-top { margin-top: 1.6rem; } .centered { box-sizing: inherit; text-align: center; } .btn { -webkit-tap-highlight-color: transparent; background-color: #00bd9a; border-radius: 10px; box-shadow: rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px, rgba(0, 0, 0, 0.2) 0px 3px 1px -2px; box-sizing: inherit; color: white; cursor: pointer; display: inline-block; height: 200px; letter-spacing: 3px; line-height: 200px; padding: 0px 1rem; pointer-events: all; position: relative; text-decoration-line: none; text-transform: uppercase; vertical-align: middle; width: 80%; font-size: 30px; } </style> <meta charset=\"utf-8\"> <meta name=\"Homepage\" content=\"Starting page for the survey website \"> <title> Survey HomePage</title> </head> <body> <div class=\"column\"> <div class=\"margin-top centered\"> <a class=\"btn\" href=\"/S\" style=\"\"> Einfacher Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"D\" style=\"\"> Doppelter Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"V\" style=\"\"> Freibezug </a> </div> </body> </html>");
-
-                                                client.println();
-                                                client.flush();
-                                                client.stop();
-                                                return StateBegin(Einfach);
-                                        }
-                                        if (currentLine.endsWith("GET /D"))
-                                        {
-                                                client.println("HTTP/1.1 200 OK");
-                                                client.println("Content-type:text/html");
-                                                client.println();
-
-                                                client.print("<!doctype html> <html lang=\"en\"> <head> <style> .column { box-sizing: inherit; display: inline-block; margin-bottom: 0em; margin-top: 0em; vertical-align: middle; width: 100%; } .margin-top { margin-top: 1.6rem; } .centered { box-sizing: inherit; text-align: center; } .btn { -webkit-tap-highlight-color: transparent; background-color: #00bd9a; border-radius: 10px; box-shadow: rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px, rgba(0, 0, 0, 0.2) 0px 3px 1px -2px; box-sizing: inherit; color: white; cursor: pointer; display: inline-block; height: 200px; letter-spacing: 3px; line-height: 200px; padding: 0px 1rem; pointer-events: all; position: relative; text-decoration-line: none; text-transform: uppercase; vertical-align: middle; width: 80%; font-size: 30px; } </style> <meta charset=\"utf-8\"> <meta name=\"Homepage\" content=\"Starting page for the survey website \"> <title> Survey HomePage</title> </head> <body> <div class=\"column\"> <div class=\"margin-top centered\"> <a class=\"btn\" href=\"/S\" style=\"\"> Einfacher Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"D\" style=\"\"> Doppelter Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"V\" style=\"\"> Freibezug </a> </div> </body> </html>");
-
-                                                client.println();
-                                                client.flush();
-                                                client.stop();
-                                                return StateBegin(Doppelt);
-                                        }
-                                        if (currentLine.endsWith("GET /V"))
-                                        {
-                                                Serial.println(currentLine);
-                                                client.println("HTTP/1.1 200 OK");
-                                                client.println("Content-type:text/html");
-                                                client.println();
-
-                                                client.print("<!doctype html> <html lang=\"en\"> <head> <style> .column { box-sizing: inherit; display: inline-block; margin-bottom: 0em; margin-top: 0em; vertical-align: middle; width: 100%; } .margin-top { margin-top: 1.6rem; } .centered { box-sizing: inherit; text-align: center; } .btn { -webkit-tap-highlight-color: transparent; background-color: #00bd9a; border-radius: 10px; box-shadow: rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px, rgba(0, 0, 0, 0.2) 0px 3px 1px -2px; box-sizing: inherit; color: white; cursor: pointer; display: inline-block; height: 200px; letter-spacing: 3px; line-height: 200px; padding: 0px 1rem; pointer-events: all; position: relative; text-decoration-line: none; text-transform: uppercase; vertical-align: middle; width: 80%; font-size: 30px; } </style> <meta charset=\"utf-8\"> <meta name=\"Homepage\" content=\"Starting page for the survey website \"> <title> Survey HomePage</title> </head> <body> <div class=\"column\"> <div class=\"margin-top centered\"> <a class=\"btn\" href=\"/S\" style=\"\"> Einfacher Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"D\" style=\"\"> Doppelter Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"V\" style=\"\"> Freibezug </a> </div> </body> </html>");
-
-                                                client.println();
-                                                client.flush();
-                                                client.stop();
-                                                return StateBegin(FreePullState);
-                                        }
-                                        if (currentLine.endsWith("GET /Q"))
-                                        {
-                                                client.println("HTTP/1.1 200 OK");
-                                                client.println("Content-type:text/html");
-                                                client.println();
-
-                                                //client.print("<form action=\"/action_page.php\"> <label for=\"fname\">Einfacher Bezug:</label> <input type=\"number\" id=\"fsingle\" name=\"fsingle\"><br><br> <label for=\"lsingle\">Doppelter Bezug:</label> <input type=\"number\" id=\"ldouble\" name=\"ldouble\"><br><br> <input type=\"submit\" value=\"Submit\"> </form>");
-                                                /*client.print("<!doctype html> <html lang=\"en\"> <head> <style> .column { box-sizing: inherit; display: inline-block; margin-bottom: 0em; margin-top: 0em; vertical-align: middle; width: 100%; } .margin-top { margin-top: 1.6rem; } .centered { box-sizing: inherit; text-align: center; } .btn { -webkit-tap-highlight-color: transparent; background-color: #00bd9a; border-radius: 10px; box-shadow: rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px, rgba(0, 0, 0, 0.2) 0px 3px 1px -2px; box-sizing: inherit; color: white; display: inline-block; height: 200px; letter-spacing: 3px; line-height: 200px; padding: 0px 1rem; pointer-events: all; position: relative; text-decoration-line: none; text-transform: uppercase; vertical-align: middle; width: 80%; font-size: 30px; } </style> <meta charset=\"utf-8\"> <meta name=\"Homepage\" content=\"Starting page for the survey website \"> <title> Survey HomePage</title> </head> <body> <div class=\"column\"> <div class=\"margin-top centered\"> <form action=\"/action_page.php\"> <div class=\"btn\"> <label for=\"fname\">Einfacher Bezug:</label> <input type=\"number\" id=\"fsingle\" name=\"fsingle\"> </div> <br> <br> <div class=\"btn\"> <label for=\"lsingle\">Doppelter Bezug:</label> <input type=\"number\" id=\"ldouble\" name=\"ldouble\"> </div> <br> <br> <div class=\"btn\"> <input type=\"submit\" value=\"Bestätigen\"> </div> <br> <br> </form> </div> </div> </body> </html>");*/
-
-                                                String html_side ="<!doctype html> <html lang=\"en\"> <head> <style> .column { box-sizing: inherit; display: inline-block; margin-bottom: 0em; margin-top: 0em; vertical-align: middle; width: 100%; } .margin-top { margin-top: 1.6rem; } .centered { box-sizing: inherit; text-align: center; } .btn { -webkit-tap-highlight-color: transparent; background-color: #00bd9a; border-radius: 10px; box-shadow: rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px, rgba(0, 0, 0, 0.2) 0px 3px 1px -2px; box-sizing: inherit; color: white; display: inline-block; height: 200px; letter-spacing: 3px; line-height: 200px; padding: 0px 1rem; pointer-events: all; position: relative; text-decoration-line: none; text-transform: uppercase; vertical-align: middle; width: 80%; font-size: 30px; } </style> <meta charset=\"utf-8\"> <meta name=\"Homepage\" content=\"Starting page for the survey website \"> <title> Survey HomePage</title> </head> <body> <div class=\"column\"> <div class=\"margin-top centered\"> <form action=\"/action_page.php\"> <div class=\"btn\"> <label for=\"fname\">Einfacher Bezug $einfach$:</label> <input type=\"number\" id=\"fsingle\" name=\"fsingle\"> </div> <br> <br> <div class=\"btn\"> <label for=\"lsingle\">Doppelter Bezug $Key1$:</label> <input type=\"number\" id=\"ldouble\" name=\"ldouble\"> </div> <br> <br> <div class=\"btn\"> <input type=\"submit\" value=\"Bestätigen\"> </div> <br> <br> </form> </div> </div> </body> </html>";
-
-                                                //Serial.println(html_side);
-                                                html_side.replace("$einfach$",String(this->T_einfach));
-                                                html_side.replace("$Key1$",String(this->T_doppelt));
-                                                //Serial.println(html_side);
-
-                                                client.print(html_side);
-
-                                                client.println();
-                                                client.flush();
-                                                client.stop();
-                                                return StateBegin(WaitForUser);
-                                        }
-                                }
-                        }
-                        client.stop();
-                        Serial.println("client disonnected");
-                }
-
-
-        }
-
-        else if ((_currentStatus == LstUserState) && (key == 'l' | key == 'r'))
-        {
-
                 return StateBegin(HoldState_2);
         }
 
-        else if ((_currentStatus == SplitPaymentQ) && key == 'b')
+        else if ((GetCurrentStatus() == SplitPaymentQ) && (GetCurrentKeyFlag() == BOTH_KEY))
         {
-
                 return StateBegin(HoldState_2);
         }
 
-        else if ((_currentStatus == WaitForUser  | _currentStatus == ShowCredit | _currentStatus == SceenSaferState) && key == 'r')
+        else if (((GetCurrentStatus() == WaitForUser) || (GetCurrentStatus() == ShowCredit) || (GetCurrentStatus() == SceenSaferState)) && (GetCurrentKeyFlag() == RIGHT_KEY))
         {
-                if (_currentStatus == SceenSaferState) _startTime = millis();
+                if (GetCurrentStatus() == SceenSaferState)
+                        SetStartTime(millis());
                 return StateBegin(HoldState);
+
         }
 
-        else if (_currentStatus == SplitPaymentQ && key == 'l')
+        else if ((GetCurrentStatus() == SplitPaymentQ) && (GetCurrentKeyFlag() == LEFT_KEY))
         {
                 return StateBegin(PayTwo);
         }
 
-        else if (_currentStatus == SplitPaymentQ && key == 'r')
+        else if (GetCurrentStatus() == SplitPaymentQ && (GetCurrentKeyFlag() == RIGHT_KEY))
         {
                 return StateBegin(PayTwo_1);
         }
 
-        else if ((_currentStatus == WaitForUser | _currentStatus == SceenSaferState )&& _userHandler.HasCardToRead())
+        else if (((GetCurrentStatus() == WaitForUser) || (GetCurrentStatus() == SceenSaferState)) && GetUserHandler().HasCardToRead())
         {
-                if (_currentStatus == SceenSaferState) _startTime = millis();
+                if (GetCurrentStatus() == SceenSaferState)
+                        SetStartTime(millis());
                 return StateBegin(ReadCreditUser);
         }
 
-        else if (_currentStatus == ReadCreditUser)
+        else if (GetCurrentStatus() == ReadCreditUser)
         {
                 return StateBegin(ShowCredit);
         }
 
-        else if (_currentStatus == PayOne && _userHandler.HasCardToRead())
+        else if (GetCurrentStatus() == PayOne && GetUserHandler().HasCardToRead())
         {
-                int Credit = _userHandler.ReadCredit();
-                int stat = 0;
-                int count = 0;
+                int _credit = GetUserHandler().ReadCredit();
+                int _status = DEFAULT_INT_INI;
+                int _counter = DEFAULT_INT_INI;
 
-                if (Credit == -1)
+                if (_credit == INVALD_CREDIT)
                 {
                         return StateBegin(PayOne);
                 }
 
-                if (Credit >= 1)
+                if (_credit >= PRICE_SINGE)
                 {
-                        stat = _userHandler.WriteCredit(Credit - 1,false);
+                        _status = GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
 
-                        if (stat == 0)
+                        if (_status == OK)
                         {
-                                delay(100);
+                                delay(DELAY_MILL_ON);
                                 return StateBegin(Einfach);
                         }
                         else
                         {
-                                while ((stat != 0) && (count < 10))
+                                while ((_status != OK) && (_counter <= ERROR_RETRY_WRITING))
                                 {
-                                        stat = _userHandler.WriteCredit(Credit - 1,false);
-                                        if (stat == 0) break;
-                                        count++;;
+                                        _status = GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
+                                        if (_status == OK)
+                                                break;
+                                        _counter++;
                                 }
 
-                                if (count > 8)
+                                if (_counter >= ERROR_RETRY_WRITING)
                                 {
-                                        _drawer.Err();
-                                        delay(2000);
+                                        GetDrawer().Err();
+                                        delay(DELAY_AFTER_ERROR);
                                         return StateBegin(WaitForUser);
                                 }
                                 else
-                                { delay(100);
-                                  return StateBegin(Einfach);}
+                                {
+                                        delay(DELAY_MILL_ON);
+                                        return StateBegin(Einfach);
+                                }
                         }
                 }
                 else
@@ -370,45 +239,47 @@ char Controller::StateTransitions()
                 }
         }
 
-        else if (_currentStatus == PayTwo && _userHandler.HasCardToRead())
+        else if (GetCurrentStatus() == PayTwo && GetUserHandler().HasCardToRead())
         {
-                int Credit = _userHandler.ReadCredit();
-                int stat = 0;
-                bool err = false;
-                int count = 0;
+                int _credit = GetUserHandler().ReadCredit();
+                int _status = DEFAULT_INT_INI;
+                int _counter = DEFAULT_INT_INI;
 
-                if (Credit == -1)
+                if (_credit == INVALD_CREDIT)
                 {
                         return StateBegin(WaitForUser);
                 }
 
-                if (Credit >= 2)
+                if (_credit >= PRICE_DOUBLE)
                 {
-                        stat = _userHandler.WriteCredit(Credit - 2,true);
+                        _status = GetUserHandler().WriteCredit(_credit - PRICE_DOUBLE, true);
 
-                        if (stat == 0)
+                        if (_status == OK)
                         {
-                                delay(100);
+                                delay(DELAY_MILL_ON);
                                 return StateBegin(Doppelt);
                         }
                         else
                         {
-                                while ((stat != 0) && (count < 10))
+                                while ((_status != OK) && (_counter <= ERROR_RETRY_WRITING))
                                 {
-                                        stat = _userHandler.WriteCredit(Credit - 2,true);
-                                        if (stat == 0) break;
-                                        count++;;
+                                        _status = GetUserHandler().WriteCredit(_credit - PRICE_DOUBLE, true);
+                                        if (_status == OK)
+                                                break;
+                                        _counter++;
                                 }
 
-                                if (count > 8)
+                                if (_counter >= ERROR_RETRY_WRITING)
                                 {
-                                        _drawer.Err();
-                                        delay(2000);
+                                        GetDrawer().Err();
+                                        delay(DELAY_AFTER_ERROR);
                                         return StateBegin(WaitForUser);
                                 }
                                 else
-                                { delay(100);
-                                  return StateBegin(Doppelt);}
+                                {
+                                        delay(DELAY_MILL_ON);
+                                        return StateBegin(Doppelt);
+                                }
                         }
                 }
                 else
@@ -417,23 +288,23 @@ char Controller::StateTransitions()
                 }
         }
 
-        else if (_currentStatus == PayTwo_1 && _userHandler.HasCardToRead())
+        else if (GetCurrentStatus() == PayTwo_1 && GetUserHandler().HasCardToRead())
         {
-                int Credit = _userHandler.ReadCredit();
+                int _credit = GetUserHandler().ReadCredit();
 
-                if (Credit == -1)
+                if (_credit == INVALD_CREDIT)
                 {
                         return StateBegin(PayTwo_1);
                 }
 
-                if (Credit >= 1)
+                if (_credit >= PRICE_SINGE)
                 {
-                        _userHandler.WriteCredit(Credit - 1,false);
+                        _userHandler.WriteCredit(_credit - PRICE_SINGE, false);
                         _userHandler.newRead();
-                        while (_currentUser == "0" || _currentUser == "")
+                        while (GetCurrentUser() == ZERO_STRING || GetCurrentUser()  == "")
                         {
-                                _currentUser = _userHandler.GetCardId();
-                                _userHandler.ReadCredit();
+                                SetCurrentUser(GetUserHandler().GetCardId());
+                                GetUserHandler().ReadCredit();
                         }
                         return StateBegin(PayTwo_2);
                 }
@@ -441,17 +312,16 @@ char Controller::StateTransitions()
                 {
                         return StateBegin(LowCredit);
                 }
-
         }
-        else if (_currentStatus == PayTwo_2 && _userHandler.HasCardToRead())
+        else if (GetCurrentStatus() == PayTwo_2 && GetUserHandler().HasCardToRead())
         {
-                String CurrentUser = _userHandler.GetCardId();
-                int Credit = _userHandler.ReadCredit();
+                String _currentUser = GetUserHandler().GetCardId();
+                int _credit = GetUserHandler().ReadCredit();
 
-                if (Credit >= 1 && _currentUser != CurrentUser && CurrentUser != 0)
+                if (_credit >= PRICE_SINGE && GetCurrentUser() != _currentUser && _currentUser != ZERO_STRING)
                 {
-                        _userHandler.WriteCredit(Credit - 1,false);
-                        delay(100);
+                        GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
+                        delay(DELAY_MILL_ON);
                         return StateBegin(Doppelt);
                 }
                 else
@@ -459,24 +329,26 @@ char Controller::StateTransitions()
                         return StateBegin(PayTwo_2);
                 }
         }
-        else if (_currentStatus == ReplayState && _userHandler.HasCardToRead())
+        else if (GetCurrentStatus() == ReplayState && GetUserHandler().HasCardToRead())
         {
-                String CurrentUser = _userHandler.GetCardId();
-                int Credit = _userHandler.ReadCredit();
-                if (Credit == -1)
+                String _currentUser = GetUserHandler().GetCardId();
+                int _credit = GetUserHandler().ReadCredit();
+                if (_credit == INVALD_CREDIT)
                 {
                         return StateBegin(ReplayState);
                 }
                 else
                 {
-                        _userHandler.WriteCredit(Credit + 1,false);
+                        GetUserHandler().WriteCredit(_credit + PRICE_SINGE, false);
                         return StateBegin(DoneState);
                 }
         }
-        else if (_currentStatus == DoneState && !(_userHandler.HasCardToRead()))
+        else if (GetCurrentStatus() == DoneState && !(GetUserHandler().HasCardToRead()))
         {
-                if (!(_userHandler.HasCardToRead()))
-                {return StateBegin(WaitForUser);}
+                if (!(GetUserHandler().HasCardToRead()))
+                {
+                        return StateBegin(WaitForUser);
+                }
                 else
                 {
                         return StateBegin(DoneState);
@@ -484,11 +356,11 @@ char Controller::StateTransitions()
         }
         else
         {
-                return _currentStatus;
+                return GetCurrentStatus();
         }
 }
 
-bool Controller::TimeOut(int time)
+bool Controller::TimeOut(unsigned long time)
 {
         if (_deltaTime >= time)
         {
@@ -498,9 +370,9 @@ bool Controller::TimeOut(int time)
         return false;
 }
 
-bool Controller::TimeOutWithBackPay(int time)
+bool Controller::TimeOutWithBackPay(unsigned long time)
 {
-        if (_deltaTime >= time)
+        if (GetTimeDelta() >= time)
         {
                 this->StateBegin(ReplayState);
                 return true;
@@ -510,7 +382,7 @@ bool Controller::TimeOutWithBackPay(int time)
 
 void Controller::UpDateTime()
 {
-        _deltaTime = millis() - _startTime;
+        SetTimeDelta(millis() - GetStartTime());
 }
 
 void Controller::States(char Status)
@@ -518,176 +390,154 @@ void Controller::States(char Status)
 
         if (Status == Einfach)
         {
-                this->MillOn();
-                int progress = ((_deltaTime) / (this->T_einfach / 100));
-                this->_drawer.DisplayProgress(progress);
-                this->TimeOut(this->T_einfach);
+                MillOn();
+                GetDrawer().DisplayProgress((GetTimeDelta()) / (GetTimeSingle() / 100));
+                TimeOut(GetTimeSingle());
         }
 
         else if (Status == Doppelt)
         {
-                this->MillOn();
-                this->_drawer.DisplayProgress(_deltaTime / (this->T_doppelt / 100));
-                this->TimeOut(this->T_doppelt);
+                MillOn();
+                GetDrawer().DisplayProgress((GetTimeDelta()) / (GetTimeDouble() / 100));
+                TimeOut(GetTimeDouble());
         }
 
         else if (Status == WaitForUser)
         {
-                _drawer.DrawWaitForUser();
+                GetDrawer().DrawWaitForUser();
 
-                //Serial.println(_deltaTime);
-
-                if (this->_deltaTime > 3600000)
+                if (GetTimeDelta() > DELAY_ACTIVATION_SCREENSAFTER)
                 {
-                        this->StateBegin(SceenSaferState);
+                        StateBegin(SceenSaferState);
                 }
         }
 
         else if (Status == FreePullState)
         {
-                _drawer.DrawFreeState();
-
-                if (this->_deltaTime > 60000)
-                {
-                        this->StateBegin(WaitForUser);
-                }
+                GetDrawer().DrawFreeState();
+                TimeOut(TIMEOUT_LONG);
         }
 
         else if (Status == PayOne)
         {
-                _drawer.DrawPayOne();
-                this->TimeOut(10000);
+                GetDrawer().DrawPayOne();
+                TimeOut(TIMEOUT_DEFAULT);
         }
 
         else if (Status == SceenSaferState)
         {
-                _drawer.DrawScreenSafer(_deltaTime);
+                GetDrawer().DrawScreenSafer(GetTimeDelta());
         }
 
         else if (Status == SplitPaymentQ)
         {
-                _drawer.DrawSplitQ2();
-                this->TimeOut(10000);
+                GetDrawer().DrawSplitQ2();
+                TimeOut(TIMEOUT_DEFAULT);
         }
 
         else if (Status == PayTwo)
         {
-                _drawer.DrawPay2();
-                this->TimeOut(10000);
+                GetDrawer().DrawPay2();
+                TimeOut(TIMEOUT_DEFAULT);
         }
 
         else if (Status == PayTwo_1)
         {
-                _drawer.DrawPay2_1();
-                this->TimeOut(10000);
+                GetDrawer().DrawPay2_1();
+                TimeOut(TIMEOUT_DEFAULT);
         }
 
         else if (Status == PayTwo_2)
         {
-                _drawer.DrawPay2_2();
-                this->TimeOutWithBackPay(15000);
+                GetDrawer().DrawPay2_2();
+                this->TimeOutWithBackPay(TIMEOUT_LONG);
         }
 
         else if (Status == LowCredit)
         {
-                _drawer.DrawLowCredit();
-                this->TimeOut(5000);
+                GetDrawer().DrawLowCredit();
+                this->TimeOut(TIMEOUT_SHORT);
         }
-
 
         else if (Status == ReadCreditUser)
         {
-                user = _userHandler.GetCardId().toInt();
-                credit = _userHandler.ReadCredit();
+                SetUserAsInt(GetUserHandler().GetCardId().toInt());
+                SetCreditAsInt(GetUserHandler().ReadCredit());
         }
 
         else if (Status == ShowCredit)
         {
-                if(user==0)
+                if (GetUserAsInt() == 0)
                 {
-                        this->TimeOut(0);
+                        TimeOut(0);
                         return;
                 }
-                _drawer.DrawCredit(user, credit);
-                this->TimeOut(5000);
+                GetDrawer().DrawCredit(GetUserAsInt(), GetCreditAsInt());
+                this->TimeOut(TIMEOUT_SHORT);
         }
         else if (Status == HoldState)
         {
-                if (_userHandler.ReadUserInput() == 'n')
+                if (GetCurrentKeyFlag() == NONE_KEY)
                 {
                         StateBegin(SplitPaymentQ);
                 }
         }
         else if (Status == HoldState_2)
         {
-                if (_userHandler.ReadUserInput() == 'n')
+                if (GetCurrentKeyFlag() == NONE_KEY)
                 {
                         StateBegin(WaitForUser);
                 }
         }
         else if (Status == ReplayState)
         {
-                _drawer.DrawReplay(_deltaTime / (30000 / 100));
-                this->TimeOut(30000);
+                GetDrawer().DrawReplay(GetTimeDelta() / (TIMEOUT_REPAY / HUNDRED_PERCENT));
+                TimeOut(TIMEOUT_REPAY);
         }
         else if (Status == DoneState)
         {
-                _drawer.DrawDoneState();
-                this->TimeOut(10000);
+                GetDrawer().DrawDoneState();
+                TimeOut(TIMEOUT_DEFAULT);
         }
         else if (Status == LstUserState)
         {
-                _drawer.DrawLastUser(this->_userHandler.getLastUser());
-                this->TimeOut(10000);
+                GetDrawer().DrawLastUser(GetUserHandler().getLastUser());
+                TimeOut(TIMEOUT_DEFAULT);
         }
         else if (Status == StopState)
         {
-                _timeInStopState = millis() - _stopBegin;
-                _drawer.DrawStopState();
-                this->MillOff();
-                this->TimeOut(60000);
+                MillOff();
+                SetTimeInStop(millis()-GetTimeStopBegin());
+                GetDrawer().DrawStopState();
+                TimeOut(TIMEOUT_LONG);
         }
         else if (Status == FinishState)
         {
-                this->MillOn();
-                Serial.println(T_rest);
-                int progress = ((_passedtime+_deltaTime) / (this->T_rest / 100));
-                Serial.println(_deltaTime);
-                this->_drawer.DisplayProgress(progress);
-                this->TimeOut(this->T_rest-_passedtime);
+                int _progress = ((_passedtime + _deltaTime) / (this->T_rest / 100));
+                MillOn();
+                GetDrawer().DisplayProgress(_progress);
+                TimeOut(GetTimeRemaning() - GetTimePassed());
         }
-
 }
 
 void Controller::Reset()
 {
-        this->MillOff();
-        this->PutCurrentStatus(WaitForUser);
-        _deltaTime = 0;
-        _startTime = millis();
-        _currentUser = String("");
-        _additionalUser = String("");
-        _currentUserId = String("");
-        _additionalUserId = String("");
-        user = 0;
-        credit = 0;
-}
-
-String Controller::GetCurrentUser()
-{
-        return this->_currentUser;
-}
-
-void Controller::SetCurrentUser(String user)
-{
-        _currentUser = user;
+        MillOff();
+        SetCurrentStatus(WaitForUser);
+        SetTimeDelta(0);
+        SetStartTime(millis());
+        SetCurrentUser("");
+        SetUserAsInt(0);
+        SetCreditAsInt(0);
+        SetOldKeyFlag('n');
+        SetCurrentKeyFlag('n');
 }
 
 char Controller::StateBegin(char state)
 {
-        this->PutCurrentStatus(state);
-        _startTime = millis();
-        this->UpDateTime();
+        SetCurrentStatus(state);
+        SetStartTime(millis());
+        UpDateTime();
         return state;
 }
 
