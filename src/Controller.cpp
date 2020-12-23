@@ -446,7 +446,7 @@ char Controller::StateTransitions()
                 }
                 if (GetCurrentKeyFlag() == RIGHT_KEY)
                 {
-                        SetTimeSingle(GetTimeDouble() + TIME_RESOLUTION);
+                        SetTimeDouble(GetTimeDouble() + TIME_RESOLUTION);
                         return AdaptTiDouble;
                 }
 
