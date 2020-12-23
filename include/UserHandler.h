@@ -21,6 +21,7 @@ struct Config {
         String SSID;
         String PW;
         int chipPage;
+        int key;
 };
 Config config;
 
@@ -38,6 +39,8 @@ void newRead();
 
 void loadConfiguration();
 bool saveConfiguration(int tiSingle, int tiDobule);
+
+bool AuthenticateUser(int localKey); 
 
 ////////////// GETTER AND SETTER BEGIN /////////////////
 
@@ -62,6 +65,9 @@ RTC_DS3231 &GetRTC();
 File &GetLogFile();
 void SetLogFile(File filename);
 
+int &GetUserKey();
+void SetUserKey(int key);
+
 ////////////// GETTER AND SETTER END ///////////////////
 
 private:
@@ -76,6 +82,8 @@ int ChipSelect_SD;
 bool SdStatus;
 bool NfcStatus;
 bool RtcStatus;
+
+int UserKey;
 
 };
 

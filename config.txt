@@ -1,0 +1,9 @@
+{
+    "Zeit_einfach": 10000,
+    "Zeit_doppelt": 20000,
+    "ServerOn": 0,
+    "SSID": "KMSERVICE",
+    "PW": "123456789",
+    "ChipPage": 5,
+    "KEY": 20
+  }

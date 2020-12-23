@@ -38,6 +38,7 @@
 #define TIMEOUT_LONG					60000
 #define TIMEOUT_SHORT					5000
 #define TIMEOUT_REPAY					30000
+#define TIME_FOR_PW_ACTIVATION			1000
 
 
 // Status defines
@@ -57,43 +58,39 @@
 #define DEFAULT_INT_INI			0
 #define ZERO_STRING				"0"
 #define HUNDRED_PERCENT			100
+#define NO_TIME					0
 
+#define KEY_LENGTH_CONTROLLER	5  
+#define TIME_RESOLUTION			200
 
 // STATES
 
 enum MillStates
 {
-	WaitForCard         	= 	0,
-	ReadCard            	= 	1,
-	WaitForInput        	= 	2,
-	Doppelt             	= 	3,
-	Einfach             	= 	4,
-	WaitForSplitBooking 	= 	5,
-	IdentSecondPayer    	= 	6,
-	UnknownUserState    	= 	7,
-	LastUserState       	= 	8,
-	CurrentDrawsState   	= 	9,
-	KaffeeKingState     	= 	10,
-	HoldState           	= 	20,
-	ReplayState         	= 	21,
-	DoneState           	= 	22,
-	SceenSaferState     	= 	23,
-	LstUserState        	= 	24,
-	HoldState_2         	= 	25,
-	FreePullState 			= 	26,
-	StopState				= 	27,
-	FinishState  	    	= 	28,
-	
+	Double             		= 	1,
+	Single             		= 	2,
+	WaitForSplitBooking 	= 	3,
+	RepayState         		= 	4,
+	DoneState           	= 	5,
+	SceenSaferState     	= 	6,
+	LstUserState        	= 	7,
+	FreePullState 			= 	8,
+	StopState				= 	9,
+	FinishState  	    	= 	10,
  	WaitForUser         	= 	11,
   	PayOne              	= 	12,
-  	SplitPaymentQ       	= 	13,
+  	AskForSplitPayment      = 	13,
   	PayTwo              	= 	14,
   	ShowCredit          	= 	15,
   	PayTwo_1            	= 	16,
   	PayTwo_2            	= 	17,
   	LowCredit           	= 	18,
   	ReadCreditUser      	= 	19,
-	ShowLastUser        	= 	24
-
+	ShowLastUser        	= 	20,
+	EnterKey				=	21,
+	WrongKey				= 	22,
+	AdaptTiSingle			= 	23,
+	AdaptTiDouble			=	24,
+	SelectTiToAdapt			= 	25
 };
 

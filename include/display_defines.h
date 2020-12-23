@@ -1,3 +1,6 @@
+#define SPACE                   " "
+#define UNDERSCORE              "_"
+
 #ifdef SIXTYFOUR
     #define TARGETFLIPMODE      1
 
@@ -6,6 +9,8 @@
     #define STEPSIZE            4
 
     #define STARTANIMATION      0 
+
+    #define KEY_LENGTH			5   
 
     #define BITTEWAEHLEN_y      21
     #define BITTEWAEHLEN_txt    "Bitte waehlen"
@@ -123,6 +128,27 @@
     #define KMNEXT_txt          "Km nEXt"
     #define KMNEXT_y            44
     #define KMNEXT_font         u8g2_font_logisoso24_tr
+
+    #define KEYINPUT_txt        "Enter Key"
+    #define KEYINPUT_y          21
+    #define KEYINPUT_font       u8g2_font_logisoso16_tr
+    #define KEY_SELECTOR_y      52
+    #define KEY_FONT            u8g2_font_logisoso24_tr
+    #define KEY_y               49
+
+    #define EINFACH_txt          "<- Singe"
+    #define EINFACH_y            28
+    #define DOPPELT_txt          "Double ->" 
+    #define DOPPELT_y            52
+    #define TIMESELECT_font      u8g2_font_logisoso16_tr
+
+    #define TIME_y               20
+    #define TIME_font            u8g2_font_logisoso16_tr
+    #define TIME_SINGLE_txt      "Single"
+    #define TIME_DOUBLE_txt      "Double" 
+    #define TIME_VALUE_y         52
+
+
 
 #else
     #define TARGETFLIPMODE      0
@@ -247,5 +273,20 @@
     #define KMNEXT_txt          "Km nEXt"
     #define KMNEXT_y            28
     #define KMNEXT_font         u8g2_font_ncenB14_tr
+
+    /* TODO */ 
+    #define KEYINPUT_txt        "Enter Key"
+    #define KEYINPUT_y          21
+    #define KEYINPUT_font       u8g2_font_logisoso16_tr
+    #define KEY_SELECTOR_y      52
+    #define KEY_FONT            u8g2_font_logisoso24_tr
+    #define KEY_y               49
+
+    #define EINFACH_txt          "<- Singe"
+    #define EINFACH_y            28
+    #define DOPPELT_txt          "Double ->" 
+    #define DOPPELT_y            52
+    #define TIMESELECT_font      u8g2_font_logisoso16_tr
+    /* TODO */
 
 #endif

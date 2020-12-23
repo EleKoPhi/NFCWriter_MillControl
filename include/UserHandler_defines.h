@@ -1,6 +1,6 @@
 // FILE NAMES
 
-#define CONFIG_FILE                 "config.txt"
+#define CONFIG_FILE                 "CONFIG.TXT"
 #define LOG_FILE                    "UserLog.txt"
 
 
@@ -11,6 +11,7 @@
 #define JSON_FLAG_PASSWORD          "PW"
 #define JSON_FLAG_CHIPPAGE          "ChipPage"
 #define JSON_FLAG_SSID              "SSID"
+#define JSON_FLAG_KEY               "KEY"
 
 #define DEFAULT_SERVERSTATE         0
 #define DEFAULT_PASSWORD            "123456789"
@@ -18,6 +19,7 @@
 #define DEFAULT_TIMEDOUBLE          20000
 #define DEFAULT_TIMESINGLE          10000
 #define DEFAULT_CHIPPAGE            4
+#define DEFAULT_KEY                 10
 
 
 // LOG DEFINES

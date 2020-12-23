@@ -27,7 +27,9 @@ void DrawCurrentAmount(int amount);
 void DrawWaitForUser();
 void DrawPayOne();
 void DrawSplitQ2();
+void DrawTimeSelect();
 void DrawPay2 ();
+void DrawTime (int Time, bool type);
 void DrawPay2_1();
 void DrawPay2_2();
 void DrawLowCredit();
@@ -35,6 +37,7 @@ void DrawCredit(int ID, int Credit);
 void Err();
 void DrawFreeState();
 void DrawStopState();
+void DrawKeyInput(int actualKey, int activeKeyElement);
 
 int GetScreensaverSize();
 void SetScreensaverSize(int Size);
