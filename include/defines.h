@@ -61,7 +61,10 @@
 #define NO_TIME					0
 
 #define KEY_LENGTH_CONTROLLER	5  
-#define TIME_RESOLUTION			200
+#define TIME_RESOLUTION			100
+#define PROGRESS_RESOLUTION		10
+#define TASK_100MS				100
+#define TASK_50MS				50
 
 // STATES
 

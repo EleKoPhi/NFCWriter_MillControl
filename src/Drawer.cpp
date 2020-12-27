@@ -330,6 +330,6 @@ void Drawer::DrawTime(int time, bool type)
                 DrawCenter(TIME_SINGLE_txt, TIME_y);
         }
 
-        DrawCenter(String(time), TIME_VALUE_y);
+        DrawCenter(String(time) + String(" ms"), TIME_VALUE_y);
         GetDisplay().sendBuffer();
 }

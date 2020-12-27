@@ -27,6 +27,27 @@ void UserHandler::SetLogFile(File filename) { _logFile = filename; }
 void UserHandler::SetUserKey(int key) { UserKey = key; }
 int &UserHandler::GetUserKey() { return UserKey; }
 
+bool &UserHandler::GetStLeft() { return KeyLeft; }
+void UserHandler::SetStLeft(bool st) { KeyLeft = st; }
+bool &UserHandler::GetStRigth() { return KeyRight; }
+void UserHandler::SetStRight(bool st) { KeyRight = st; }
+bool &UserHandler::GetStBoth() { return KeyBoth; }
+void UserHandler::SetStBoth(bool st) { KeyBoth = st; }
+
+void UserHandler::StartKeyDebounce() { debounce = millis(); };
+bool UserHandler::DebounceFinished(unsigned long time)
+{
+        return (millis() - GetTimer()) > time;
+}
+unsigned long &UserHandler::GetTimer() { return debounce; };
+void UserHandler::SetTimer(long ti) { debounce = ti; }
+
+bool UserHandler::KeyRight = false;
+bool UserHandler::KeyLeft = false;
+bool UserHandler::KeyBoth = false;
+
+unsigned long UserHandler::debounce = 0;
+
 UserHandler::UserHandler(int chipSelect, int slaveSelect, int rstPin) : _nfcReader(slaveSelect, rstPin)
 {
         SetChipSelectSD(chipSelect);
@@ -57,6 +78,13 @@ void UserHandler::loadConfiguration()
         _file.close();
 }
 
+void UserHandler::ResetInput()
+{
+        SetStBoth(false);
+        SetStLeft(false);
+        SetStRight(false);
+}
+
 void UserHandler::begin()
 {
         SPI.begin();
@@ -69,25 +97,54 @@ void UserHandler::begin()
         SetNFCStatus(GetNFCReader().PCD_PerformSelfTest());
         _nfcReader.PCD_Init();
 
-        Serial.println(GetRTCStatus());
-        Serial.println(GetSDStatus());
-        Serial.println(GetNFCStatus());
-
         pinMode(taster_LINKS_pin, INPUT);
+        attachInterrupt(digitalPinToInterrupt(taster_LINKS_pin), ISR_Left, FALLING);
         pinMode(taster_RECHTS_pin, INPUT);
+        attachInterrupt(digitalPinToInterrupt(taster_RECHTS_pin), ISR_Right, FALLING);
 
         loadConfiguration();
 }
 
 bool UserHandler::AuthenticateUser(int localKey)
 {
-        Serial.println(localKey);
-        Serial.println(config.key);
-        return config.key == localKey;
+        return (config.key == localKey);
+}
+
+void UserHandler::ISR_Left()
+{
+        if (DebounceFinished(DEBOUNCE_KEYS_MS))
+        {
+                if (digitalRead(taster_RECHTS_pin))
+                {
+                        SetStBoth(true);
+                }
+                else
+                {
+                        SetStLeft(true);
+                }
+                StartKeyDebounce();
+        }
+}
+
+void UserHandler::ISR_Right()
+{
+        if (DebounceFinished(DEBOUNCE_KEYS_MS))
+        {
+                if (digitalRead(taster_LINKS_pin))
+                {
+                        SetStBoth(true);
+                }
+                else
+                {
+                        SetStRight(true);
+                }
+                StartKeyDebounce();
+        }
 }
 
 char UserHandler::ReadUserInput()
 {
+
         if (digitalRead(taster_LINKS_pin))
         {
                 if (digitalRead(taster_RECHTS_pin))
@@ -280,7 +337,6 @@ bool UserHandler::saveConfiguration(int tiSingle, int tiDobule)
 
         if (tiSingle < TiSingleMin || tiSingle > TiSingleMax || tiSingle >= tiDobule || tiDobule < TiDoubleMin || tiDobule > TiDoubleMax)
         {
-                Serial.println("Range check failed");
                 return false;
         }
 
@@ -289,14 +345,10 @@ bool UserHandler::saveConfiguration(int tiSingle, int tiDobule)
         File _file = SD.open(CONFIG_FILE, FILE_WRITE);
         if (!_file)
         {
-                Serial.println("SD Fail");
                 return false;
         }
 
         StaticJsonDocument<512> doc;
-
-        Serial.println(tiSingle);
-        Serial.println(tiDobule);
 
         doc[JSON_FLAG_SSID] = config.SSID;
         doc[JSON_FLAG_PASSWORD] = config.PW;
@@ -312,7 +364,6 @@ bool UserHandler::saveConfiguration(int tiSingle, int tiDobule)
                 Serial.println(F("Failed to write to file"));
         }
 
-        Serial.println("Sored file ");
         _file.close();
         return true;
 }

@@ -16,7 +16,25 @@ void Controller::SetCurrentStatus(char stat) { _currentStatus = stat; }
 char &Controller::GetCurrentStatus() { return _currentStatus; }
 
 void Controller::SetCurrentKeyFlag(char key) { this->key = key; }
-char &Controller::GetCurrentKeyFlag() { return this->key; }
+char Controller::GetCurrentKeyFlag()
+{
+        if (GetUserHandler().GetStBoth())
+        {
+                return BOTH_KEY;
+        }
+        else if (GetUserHandler().GetStLeft())
+        {
+                return LEFT_KEY;
+        }
+        else if (GetUserHandler().GetStRigth())
+        {
+                return RIGHT_KEY;
+        }
+        else
+        {
+                return NONE_KEY;
+        }
+}
 
 void Controller::SetTempKeyFlag(char key) { this->temp_oldKey = key; }
 char &Controller::GetTempKeyFlag() { return this->temp_oldKey; }
@@ -74,6 +92,12 @@ void Controller::SetActiveKeyElement(int element)
 int &Controller::GetLocalKey() { return this->localKey; }
 void Controller::SetLocalKey(int key) { this->localKey = key; }
 
+int &Controller::GetLocalKeyDisplayed() { return this->localKey_displayed; }
+void Controller::SetLocalKeyDisplayed(int key) { this->localKey_displayed = key; }
+
+int &Controller::GetActiveKeyElementDisplayed() { return this->activeKeyElement_displayed; }
+void Controller::SetActiveKeyElementDispayed(int element) { this->activeKeyElement_displayed = element; }
+
 unsigned long &Controller::GetTiRight() { return this->_ti_r_down; }
 void Controller::SetTiRight(unsigned long ti) { this->_ti_r_down = ti; }
 
@@ -82,6 +106,12 @@ void Controller::SetTiLeft(unsigned long ti) { this->_ti_l_down = ti; }
 
 unsigned long &Controller::GetTiBoth() { return this->_ti_both_down; }
 void Controller::SetTiBoth(unsigned long ti) { this->_ti_both_down = ti; }
+
+unsigned long &Controller::GetTimer100ms() { return this->timer100ms; }
+void Controller::SetTimer100ms(unsigned long ti) { this->timer100ms = ti; }
+
+unsigned long &Controller::GetTimer50ms() { return this->timer10ms; }
+void Controller::SetTimer50ms(unsigned long ti) { this->timer10ms = ti; }
 
 unsigned long &Controller::GetDeltaTiRight() { return this->_delta_ti_r_down; }
 void Controller::SetDeltaTiRight(unsigned long ti) { this->_delta_ti_r_down = ti; }
@@ -92,7 +122,541 @@ void Controller::SetDeltaTiLeft(unsigned long ti) { this->_delta_ti_l_down = ti;
 unsigned long &Controller::GetDeltaTiBoth() { return this->_delta_ti_both_down; }
 void Controller::SetDeltaTiBoth(unsigned long ti) { this->_delta_ti_both_down = ti; }
 
+bool &Controller::GetUpdateDisplay() { return this->updateDisplay; }
+void Controller::SetUpdateDisplay(bool st) { this->updateDisplay = st; }
+
+int &Controller::GetDisplayedProgress() { return this->progress; }
+void Controller::SetDisplayedProgress(int prog) { this->progress = prog; }
+
+int &Controller::GetProgress() { return this->progress_temp; }
+void Controller::SetProgress(int prog) { this->progress_temp = prog; }
+
 /////////////////////////////////////////////////////////////////////////////////
+
+char Controller::tr_WaitForUser()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                return StateBegin(PayOne);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                return StateBegin(AskForSplitPayment);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(ShowLastUser);
+        }
+        else if (GetUserHandler().HasCardToRead())
+        {
+                return StateBegin(ReadCreditUser);
+        }
+        else if (GetTiLeft() > TIME_FOR_PW_ACTIVATION)
+        {
+                return StateBegin(EnterKey);
+        }
+        else if (GetTimeDelta() > DELAY_ACTIVATION_SCREENSAFTER)
+        {
+                return StateBegin(SceenSaferState);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_EnterKey()
+{
+        if (GetUserHandler().AuthenticateUser(GetLocalKey()))
+        {
+                return StateBegin(SelectTiToAdapt);
+        }
+        else if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                SetActiveKeyElement(GetActiveKeyElement() + 1);
+                GetUserHandler().ResetInput();
+                return (EnterKey);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                SetLocalKey(GetLocalKey() ^= 1UL << GetActiveKeyElement());
+                GetUserHandler().ResetInput();
+                return (EnterKey);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(WaitForUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_SelectToToAdapt()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                return StateBegin(AdaptTiSingle);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                return StateBegin(AdaptTiDouble);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(WaitForUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_ShowCredit()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                return StateBegin(PayOne);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                return StateBegin(AskForSplitPayment);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(ShowLastUser);
+        }
+        else if (GetUserHandler().HasCardToRead())
+        {
+                return StateBegin(ReadCreditUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_Screensafer()
+{
+        SetStartTime(millis());
+
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                return StateBegin(PayOne);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                return StateBegin(AskForSplitPayment);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(ShowLastUser);
+        }
+        else if (GetUserHandler().HasCardToRead())
+        {
+                return StateBegin(ReadCreditUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_Single()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                SetTimeRemaning(GetTimeSingle());
+                SetTimePassed(GetTimeDelta());
+                SetTimeStopBegin(millis());
+                SetTimeInStop(NO_TIME);
+                return StateBegin(StopState);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                SetTimeRemaning(GetTimeSingle());
+                SetTimePassed(GetTimeDelta());
+                SetTimeStopBegin(millis());
+                SetTimeInStop(NO_TIME);
+                return StateBegin(StopState);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_Dobule()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                SetTimeRemaning(GetTimeDouble());
+                SetTimePassed(GetTimeDelta());
+                SetTimeStopBegin(millis());
+                SetTimeInStop(NO_TIME);
+                return StateBegin(StopState);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                SetTimeRemaning(GetTimeDouble());
+                SetTimePassed(GetTimeDelta());
+                SetTimeStopBegin(millis());
+                SetTimeInStop(NO_TIME);
+                return StateBegin(StopState);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_FinishState()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                SetTimePassed(GetTimeDelta() + GetTimePassed());
+                SetTimeStopBegin(millis());
+                SetTimeInStop(NO_TIME);
+                return StateBegin(StopState);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                SetTimePassed(GetTimeDelta() + GetTimePassed());
+                SetTimeStopBegin(millis());
+                SetTimeInStop(NO_TIME);
+                return StateBegin(StopState);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_StopState()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                SetTimeInStop(NO_TIME);
+                SetTimeStopBegin(NO_TIME);
+                return StateBegin(WaitForUser);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                MillOn();
+                return StateBegin(FinishState);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_FreePullState()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                MillOn();
+                return StateBegin(Single);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                MillOn();
+                return StateBegin(Double);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_AskForSplitPayment()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                return StateBegin(PayTwo);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                return StateBegin(PayTwo_1);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(WaitForUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_ReadCreditUser()
+{
+        return StateBegin(ShowCredit);
+}
+char Controller::tr_AdaptTiDouble()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                SetTimeDouble(GetTimeDouble() - TIME_RESOLUTION);
+                SetUpdateDisplay(true);
+                GetUserHandler().ResetInput();
+                return AdaptTiDouble;
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                SetTimeDouble(GetTimeDouble() + TIME_RESOLUTION);
+                SetUpdateDisplay(true);
+                GetUserHandler().ResetInput();
+                return AdaptTiDouble;
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                GetUserHandler().saveConfiguration(GetTimeSingle(), GetTimeDouble());
+                return StateBegin(WaitForUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_AdaptTiSingle()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                SetTimeSingle(GetTimeSingle() - TIME_RESOLUTION);
+                SetUpdateDisplay(true);
+                GetUserHandler().ResetInput();
+                return AdaptTiSingle;
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                SetTimeSingle(GetTimeSingle() + TIME_RESOLUTION);
+                SetUpdateDisplay(true);
+                GetUserHandler().ResetInput();
+                return AdaptTiSingle;
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                GetUserHandler().saveConfiguration(GetTimeSingle(), GetTimeDouble());
+                return StateBegin(WaitForUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_PayOne()
+{
+        if (GetUserHandler().HasCardToRead())
+        {
+                int _credit = GetUserHandler().ReadCredit();
+                int _status = DEFAULT_INT_INI;
+                int _counter = DEFAULT_INT_INI;
+
+                if (_credit == INVALD_CREDIT)
+                {
+                        return StateBegin(PayOne);
+                }
+
+                if (_credit >= PRICE_SINGE)
+                {
+                        _status = GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
+
+                        if (_status == OK)
+                        {
+                                delay(DELAY_MILL_ON);
+                                MillOn();
+                                return StateBegin(Single);
+                        }
+                        else
+                        {
+                                while ((_status != OK) && (_counter <= ERROR_RETRY_WRITING))
+                                {
+                                        _status = GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
+                                        if (_status == OK)
+                                                break;
+                                        _counter++;
+                                }
+
+                                if (_counter >= ERROR_RETRY_WRITING)
+                                {
+                                        GetDrawer().Err();
+                                        delay(DELAY_AFTER_ERROR);
+                                        return StateBegin(WaitForUser);
+                                }
+                                else
+                                {
+                                        delay(DELAY_MILL_ON);
+                                        MillOn();
+                                        return StateBegin(Single);
+                                }
+                        }
+                }
+                else
+                {
+                        return StateBegin(LowCredit);
+                }
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(WaitForUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_PayTwo()
+{
+        if (GetUserHandler().HasCardToRead())
+        {
+                int _credit = GetUserHandler().ReadCredit();
+                int _status = DEFAULT_INT_INI;
+                int _counter = DEFAULT_INT_INI;
+
+                if (_credit == INVALD_CREDIT)
+                {
+                        return StateBegin(WaitForUser);
+                }
+
+                if (_credit >= PRICE_DOUBLE)
+                {
+                        _status = GetUserHandler().WriteCredit(_credit - PRICE_DOUBLE, true);
+
+                        if (_status == OK)
+                        {
+                                delay(DELAY_MILL_ON);
+                                MillOn();
+                                return StateBegin(Double);
+                        }
+                        else
+                        {
+                                while ((_status != OK) && (_counter <= ERROR_RETRY_WRITING))
+                                {
+                                        _status = GetUserHandler().WriteCredit(_credit - PRICE_DOUBLE, true);
+                                        if (_status == OK)
+                                                break;
+                                        _counter++;
+                                }
+
+                                if (_counter >= ERROR_RETRY_WRITING)
+                                {
+                                        GetDrawer().Err();
+                                        delay(DELAY_AFTER_ERROR);
+                                        return StateBegin(WaitForUser);
+                                }
+                                else
+                                {
+                                        delay(DELAY_MILL_ON);
+                                        MillOn();
+                                        return StateBegin(Double);
+                                }
+                        }
+                }
+                else
+                {
+                        return StateBegin(LowCredit);
+                }
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(WaitForUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_PayTwo_1()
+{
+        if (GetUserHandler().HasCardToRead())
+        {
+                int _credit = GetUserHandler().ReadCredit();
+
+                if (_credit == INVALD_CREDIT)
+                {
+                        return StateBegin(PayTwo_1);
+                }
+
+                if (_credit >= PRICE_SINGE)
+                {
+                        _userHandler.WriteCredit(_credit - PRICE_SINGE, false);
+                        _userHandler.newRead();
+                        while (GetCurrentUser() == ZERO_STRING || GetCurrentUser() == "")
+                        {
+                                SetCurrentUser(GetUserHandler().GetCardId());
+                                GetUserHandler().ReadCredit();
+                        }
+                        return StateBegin(PayTwo_2);
+                }
+                else
+                {
+                        return StateBegin(LowCredit);
+                }
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(WaitForUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_PayTwo_2()
+{
+        if (GetUserHandler().HasCardToRead())
+        {
+
+                String _currentUser = GetUserHandler().GetCardId();
+                int _credit = GetUserHandler().ReadCredit();
+
+                if (_credit >= PRICE_SINGE && GetCurrentUser() != _currentUser && _currentUser != ZERO_STRING)
+                {
+                        GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
+                        delay(DELAY_MILL_ON);
+                        MillOn();
+                        return StateBegin(Double);
+                }
+                else
+                {
+                        return StateBegin(PayTwo_2);
+                }
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_RepayState()
+{
+        if (GetUserHandler().HasCardToRead())
+        {
+                String _currentUser = GetUserHandler().GetCardId();
+                int _credit = GetUserHandler().ReadCredit();
+                if (_credit == INVALD_CREDIT)
+                {
+                        return StateBegin(RepayState);
+                }
+                else
+                {
+                        GetUserHandler().WriteCredit(_credit + PRICE_SINGE, false);
+                        return StateBegin(DoneState);
+                }
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+char Controller::tr_DoneState()
+{
+        if (!(GetUserHandler().HasCardToRead()))
+        {
+                if (!(GetUserHandler().HasCardToRead()))
+                {
+                        return StateBegin(WaitForUser);
+                }
+                else
+                {
+                        return StateBegin(DoneState);
+                }
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
 
 void Controller::Begin()
 {
@@ -124,9 +688,12 @@ void Controller::Begin()
 
         // Setup watchdog time to 2s. One cycle is around 300ms
         GetWatchDog().setup(WDT_HARDCYCLE2S);
+
+        // Draw initial screen
+        SetUpdateDisplay(true);
 }
 
-char Controller::StateTransitions()
+void Controller::ProcessInput()
 {
         SetOldKeyFlag(GetTempKeyFlag());
         SetTempKeyFlag(GetUserHandler().ReadUserInput());
@@ -184,467 +751,57 @@ char Controller::StateTransitions()
                         SetDeltaTiBoth(DEFAULT_INT_INI);
                 }
         }
+}
 
-        if ((GetOldKeyFlag() == LEFT_KEY) && (GetTempKeyFlag() == NONE_KEY))
+char Controller::StateTransitions()
+{
+        if ((millis() - GetTimer50ms()) > TASK_50MS)
         {
-                SetCurrentKeyFlag(LEFT_KEY);
-        }
-        else if ((GetOldKeyFlag() == RIGHT_KEY) && (GetTempKeyFlag() == NONE_KEY))
-        {
-                SetCurrentKeyFlag(RIGHT_KEY);
-        }
-        else if ((GetOldKeyFlag() == BOTH_KEY) && (GetTempKeyFlag() == NONE_KEY))
-        {
-                SetCurrentKeyFlag(BOTH_KEY);
-        }
-        else if ((GetOldKeyFlag() == NONE_KEY) && (GetTempKeyFlag() == NONE_KEY))
-        {
-                SetCurrentKeyFlag(NONE_KEY);
-        }
+                SetTimer50ms(millis());
 
-        if (GetCurrentStatus() == WaitForUser)
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
+                switch (GetCurrentStatus())
                 {
-                        return StateBegin(PayOne);
-                }
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        return StateBegin(AskForSplitPayment);
-                }
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        return StateBegin(ShowLastUser);
-                }
-                if (GetUserHandler().HasCardToRead())
-                {
-                        return StateBegin(ReadCreditUser);
-                }
-                if (GetTiLeft() > TIME_FOR_PW_ACTIVATION)
-                {
-                        return StateBegin(EnterKey);
-                }
-        }
-
-        else if (GetCurrentStatus() == EnterKey)
-        {
-                if (GetUserHandler().AuthenticateUser(GetLocalKey()))
-                {
-                        return StateBegin(SelectTiToAdapt);
-                }
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        SetActiveKeyElement(GetActiveKeyElement() + 1);
-                        return (EnterKey);
-                }
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        SetLocalKey(GetLocalKey() ^= 1UL << GetActiveKeyElement());
-                        return (EnterKey);
-                }
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        return StateBegin(WaitForUser);
-                }
-        }
-
-        else if (GetCurrentStatus() == SelectTiToAdapt)
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        return StateBegin(AdaptTiSingle);
-                }
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        return StateBegin(AdaptTiDouble);
-                }
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        return StateBegin(WaitForUser);
-                }
-        }
-
-        else if (GetCurrentStatus() == ShowCredit)
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        return StateBegin(PayOne);
-                }
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        return StateBegin(AskForSplitPayment);
-                }
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        return StateBegin(ShowLastUser);
-                }
-                if (GetUserHandler().HasCardToRead())
-                {
-                        return StateBegin(ReadCreditUser);
-                }
-        }
-
-        else if (GetCurrentStatus() == SceenSaferState)
-        {
-                SetStartTime(millis());
-
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        return StateBegin(PayOne);
-                }
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        return StateBegin(AskForSplitPayment);
-                }
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        return StateBegin(ShowLastUser);
-                }
-                if (GetUserHandler().HasCardToRead())
-                {
-                        return StateBegin(ReadCreditUser);
-                }
-        }
-
-        else if (GetCurrentStatus() == Single)
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        SetTimeRemaning(GetTimeSingle());
-                        SetTimePassed(GetTimeDelta());
-                        SetTimeStopBegin(millis());
-                        SetTimeInStop(NO_TIME);
-                        return StateBegin(StopState);
-                }
-
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        SetTimeRemaning(GetTimeSingle());
-                        SetTimePassed(GetTimeDelta());
-                        SetTimeStopBegin(millis());
-                        SetTimeInStop(NO_TIME);
-                        return StateBegin(StopState);
-                }
-        }
-
-        else if (GetCurrentStatus() == Double)
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        SetTimeRemaning(GetTimeDouble());
-                        SetTimePassed(GetTimeDelta());
-                        SetTimeStopBegin(millis());
-                        SetTimeInStop(NO_TIME);
-                        return StateBegin(StopState);
-                }
-
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        SetTimeRemaning(GetTimeDouble());
-                        SetTimePassed(GetTimeDelta());
-                        SetTimeStopBegin(millis());
-                        SetTimeInStop(NO_TIME);
-                        return StateBegin(StopState);
-                }
-        }
-
-        else if (GetCurrentStatus() == FinishState)
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        SetTimePassed(GetTimeDelta() + GetTimePassed());
-                        SetTimeStopBegin(millis());
-                        SetTimeInStop(NO_TIME);
-                        return StateBegin(StopState);
-                }
-
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        SetTimePassed(GetTimeDelta() + GetTimePassed());
-                        SetTimeStopBegin(millis());
-                        SetTimeInStop(NO_TIME);
-                        return StateBegin(StopState);
-                }
-        }
-
-        else if ((GetCurrentStatus() == StopState))
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        SetTimeInStop(NO_TIME);
-                        SetTimeStopBegin(NO_TIME);
-                        return StateBegin(WaitForUser);
-                }
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        return StateBegin(FinishState);
-                }
-        }
-
-        else if (GetCurrentStatus() == FreePullState)
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        return StateBegin(Single);
-                }
-                else if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        return StateBegin(Double);
-                }
-                else
-                {
-                        return GetCurrentStatus();
-                }
-        }
-
-        else if ((GetCurrentStatus() == AskForSplitPayment))
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        return StateBegin(PayTwo);
-                }
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        return StateBegin(PayTwo_1);
-                }
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        return StateBegin(WaitForUser);
-                }
-        }
-
-        else if (GetCurrentStatus() == ReadCreditUser)
-        {
-                return StateBegin(ShowCredit);
-        }
-
-        else if (GetCurrentStatus() == AdaptTiSingle)
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        SetTimeSingle(GetTimeSingle() - TIME_RESOLUTION);
-                        return AdaptTiSingle;
-                }
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        SetTimeSingle(GetTimeSingle() + TIME_RESOLUTION);
-                        return AdaptTiSingle;
-                }
-
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        GetUserHandler().saveConfiguration(GetTimeSingle(), GetTimeDouble());
-                        return StateBegin(WaitForUser);
-                }
-        }
-        else if (GetCurrentStatus() == AdaptTiDouble)
-        {
-                if (GetCurrentKeyFlag() == LEFT_KEY)
-                {
-                        SetTimeDouble(GetTimeDouble() - TIME_RESOLUTION);
-                        return AdaptTiDouble;
-                }
-                if (GetCurrentKeyFlag() == RIGHT_KEY)
-                {
-                        SetTimeDouble(GetTimeDouble() + TIME_RESOLUTION);
-                        return AdaptTiDouble;
-                }
-
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        GetUserHandler().saveConfiguration(GetTimeSingle(), GetTimeDouble());
-                        return StateBegin(WaitForUser);
-                }
-        }
-
-        else if (GetCurrentStatus() == PayOne)
-        {
-                if (GetUserHandler().HasCardToRead())
-                {
-                        int _credit = GetUserHandler().ReadCredit();
-                        int _status = DEFAULT_INT_INI;
-                        int _counter = DEFAULT_INT_INI;
-
-                        if (_credit == INVALD_CREDIT)
-                        {
-                                return StateBegin(PayOne);
-                        }
-
-                        if (_credit >= PRICE_SINGE)
-                        {
-                                _status = GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
-
-                                if (_status == OK)
-                                {
-                                        delay(DELAY_MILL_ON);
-                                        return StateBegin(Single);
-                                }
-                                else
-                                {
-                                        while ((_status != OK) && (_counter <= ERROR_RETRY_WRITING))
-                                        {
-                                                _status = GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
-                                                if (_status == OK)
-                                                        break;
-                                                _counter++;
-                                        }
-
-                                        if (_counter >= ERROR_RETRY_WRITING)
-                                        {
-                                                GetDrawer().Err();
-                                                delay(DELAY_AFTER_ERROR);
-                                                return StateBegin(WaitForUser);
-                                        }
-                                        else
-                                        {
-                                                delay(DELAY_MILL_ON);
-                                                return StateBegin(Single);
-                                        }
-                                }
-                        }
-                        else
-                        {
-                                return StateBegin(LowCredit);
-                        }
-                }
-
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        return StateBegin(WaitForUser);
-                }
-        }
-
-        else if (GetCurrentStatus() == PayTwo)
-        {
-                if (GetUserHandler().HasCardToRead())
-                {
-                        int _credit = GetUserHandler().ReadCredit();
-                        int _status = DEFAULT_INT_INI;
-                        int _counter = DEFAULT_INT_INI;
-
-                        if (_credit == INVALD_CREDIT)
-                        {
-                                return StateBegin(WaitForUser);
-                        }
-
-                        if (_credit >= PRICE_DOUBLE)
-                        {
-                                _status = GetUserHandler().WriteCredit(_credit - PRICE_DOUBLE, true);
-
-                                if (_status == OK)
-                                {
-                                        delay(DELAY_MILL_ON);
-                                        return StateBegin(Double);
-                                }
-                                else
-                                {
-                                        while ((_status != OK) && (_counter <= ERROR_RETRY_WRITING))
-                                        {
-                                                _status = GetUserHandler().WriteCredit(_credit - PRICE_DOUBLE, true);
-                                                if (_status == OK)
-                                                        break;
-                                                _counter++;
-                                        }
-
-                                        if (_counter >= ERROR_RETRY_WRITING)
-                                        {
-                                                GetDrawer().Err();
-                                                delay(DELAY_AFTER_ERROR);
-                                                return StateBegin(WaitForUser);
-                                        }
-                                        else
-                                        {
-                                                delay(DELAY_MILL_ON);
-                                                return StateBegin(Double);
-                                        }
-                                }
-                        }
-                        else
-                        {
-                                return StateBegin(LowCredit);
-                        }
-                }
-
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        return StateBegin(WaitForUser);
-                }
-        }
-
-        else if (GetCurrentStatus() == PayTwo_1)
-        {
-                if (GetUserHandler().HasCardToRead())
-                {
-                        int _credit = GetUserHandler().ReadCredit();
-
-                        if (_credit == INVALD_CREDIT)
-                        {
-                                return StateBegin(PayTwo_1);
-                        }
-
-                        if (_credit >= PRICE_SINGE)
-                        {
-                                _userHandler.WriteCredit(_credit - PRICE_SINGE, false);
-                                _userHandler.newRead();
-                                while (GetCurrentUser() == ZERO_STRING || GetCurrentUser() == "")
-                                {
-                                        SetCurrentUser(GetUserHandler().GetCardId());
-                                        GetUserHandler().ReadCredit();
-                                }
-                                return StateBegin(PayTwo_2);
-                        }
-                        else
-                        {
-                                return StateBegin(LowCredit);
-                        }
-                }
-
-                if (GetCurrentKeyFlag() == BOTH_KEY)
-                {
-                        return StateBegin(WaitForUser);
-                }
-        }
-        else if (GetCurrentStatus() == PayTwo_2 && GetUserHandler().HasCardToRead())
-        {
-
-                String _currentUser = GetUserHandler().GetCardId();
-                int _credit = GetUserHandler().ReadCredit();
-
-                if (_credit >= PRICE_SINGE && GetCurrentUser() != _currentUser && _currentUser != ZERO_STRING)
-                {
-                        GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
-                        delay(DELAY_MILL_ON);
-                        return StateBegin(Double);
-                }
-                else
-                {
-                        return StateBegin(PayTwo_2);
-                }
-        }
-        else if (GetCurrentStatus() == RepayState && GetUserHandler().HasCardToRead())
-        {
-                String _currentUser = GetUserHandler().GetCardId();
-                int _credit = GetUserHandler().ReadCredit();
-                if (_credit == INVALD_CREDIT)
-                {
-                        return StateBegin(RepayState);
-                }
-                else
-                {
-                        GetUserHandler().WriteCredit(_credit + PRICE_SINGE, false);
-                        return StateBegin(DoneState);
-                }
-        }
-        else if (GetCurrentStatus() == DoneState && !(GetUserHandler().HasCardToRead()))
-        {
-                if (!(GetUserHandler().HasCardToRead()))
-                {
-                        return StateBegin(WaitForUser);
-                }
-                else
-                {
-                        return StateBegin(DoneState);
-                }
+                case WaitForUser:
+                        return (tr_WaitForUser());
+                case EnterKey:
+                        return (tr_EnterKey());
+                case SelectTiToAdapt:
+                        return (tr_SelectToToAdapt());
+                case ShowCredit:
+                        return (tr_ShowCredit());
+                case SceenSaferState:
+                        return (tr_Screensafer());
+                case Single:
+                        return (tr_Single());
+                case Double:
+                        return (tr_Dobule());
+                case FinishState:
+                        return (tr_FinishState());
+                case StopState:
+                        return (tr_StopState());
+                case FreePullState:
+                        return (tr_FreePullState());
+                case AskForSplitPayment:
+                        return (tr_AskForSplitPayment());
+                case ReadCreditUser:
+                        return (tr_ReadCreditUser());
+                case AdaptTiSingle:
+                        return (tr_AdaptTiSingle());
+                case AdaptTiDouble:
+                        return (tr_AdaptTiDouble());
+                case PayOne:
+                        return (tr_PayOne());
+                case PayTwo:
+                        return (tr_PayTwo());
+                case PayTwo_1:
+                        return (tr_PayTwo_1());
+                case RepayState:
+                        return (tr_RepayState());
+                case DoneState:
+                        return (tr_DoneState());
+                default:
+                        return (tr_WaitForUser());
+                };
         }
         else
         {
@@ -680,145 +837,255 @@ void Controller::UpDateTime()
 
 void Controller::States(char Status)
 {
-
-        if (Status == Single)
+        if ((millis() - GetTimer100ms()) > TASK_100MS)
         {
-                MillOn();
-                GetDrawer().DisplayProgress((GetTimeDelta()) / (GetTimeSingle() / 100));
-                TimeOut(GetTimeSingle());
-        }
+                SetTimer100ms(millis());
 
-        else if (Status == Double)
-        {
-                MillOn();
-                GetDrawer().DisplayProgress((GetTimeDelta()) / (GetTimeDouble() / 100));
-                TimeOut(GetTimeDouble());
-        }
+                ProcessInput();
 
-        else if (Status == EnterKey)
-        {
-                GetDrawer().DrawKeyInput(GetLocalKey(), GetActiveKeyElement());
-                TimeOut(TIMEOUT_LONG);
-        }
-
-        else if (Status == WaitForUser)
-        {
-                GetDrawer().DrawWaitForUser();
-                if (GetTimeDelta() > DELAY_ACTIVATION_SCREENSAFTER)
+                if (Status == WaitForUser)
                 {
-                        StateBegin(SceenSaferState);
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawWaitForUser();
+                                SetUpdateDisplay(false);
+                        }
                 }
-        }
 
-        else if (Status == FreePullState)
-        {
-                GetDrawer().DrawFreeState();
-                TimeOut(TIMEOUT_LONG);
-        }
-
-        else if (Status == AdaptTiDouble)
-        {
-                GetDrawer().DrawTime(GetTimeDouble(), true);
-                TimeOut(TIMEOUT_LONG);
-        }
-
-        else if (Status == AdaptTiSingle)
-        {
-                GetDrawer().DrawTime(GetTimeSingle(), false);
-                TimeOut(TIMEOUT_LONG);
-        }
-
-        else if (Status == PayOne)
-        {
-                GetDrawer().DrawPayOne();
-                TimeOut(TIMEOUT_DEFAULT);
-        }
-
-        else if (Status == SceenSaferState)
-        {
-                GetDrawer().DrawScreenSafer(GetTimeDelta());
-        }
-
-        else if (Status == AskForSplitPayment)
-        {
-                GetDrawer().DrawSplitQ2();
-                TimeOut(TIMEOUT_DEFAULT);
-        }
-
-        else if (Status == SelectTiToAdapt)
-        {
-                GetDrawer().DrawTimeSelect();
-                TimeOut(TIMEOUT_LONG);
-        }
-
-        else if (Status == PayTwo)
-        {
-                GetDrawer().DrawPay2();
-                TimeOut(TIMEOUT_DEFAULT);
-        }
-
-        else if (Status == PayTwo_1)
-        {
-                GetDrawer().DrawPay2_1();
-                TimeOut(TIMEOUT_DEFAULT);
-        }
-
-        else if (Status == PayTwo_2)
-        {
-                GetDrawer().DrawPay2_2();
-                this->TimeOutWithBackPay(TIMEOUT_LONG);
-        }
-
-        else if (Status == LowCredit)
-        {
-                GetDrawer().DrawLowCredit();
-                this->TimeOut(TIMEOUT_SHORT);
-        }
-
-        else if (Status == ReadCreditUser)
-        {
-                SetUserAsInt(GetUserHandler().GetCardId().toInt());
-                SetCreditAsInt(GetUserHandler().ReadCredit());
-        }
-
-        else if (Status == ShowCredit)
-        {
-                if (GetUserAsInt() == 0)
+                else if (Status == Single)
                 {
-                        TimeOut(0);
-                        return;
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DisplayProgress(GetProgress());
+                                SetUpdateDisplay(false);
+                        }
+                        else if (GetProgress() >= GetDisplayedProgress() + PROGRESS_RESOLUTION)
+                        {
+                                GetDrawer().DisplayProgress(GetDisplayedProgress());
+                                SetDisplayedProgress(GetProgress());
+                        }
+                        else
+                        {
+                                SetProgress((GetTimeDelta()) / (GetTimeSingle() / HUNDRED_PERCENT));
+                        }
+
+                        TimeOut(GetTimeSingle());
                 }
-                GetDrawer().DrawCredit(GetUserAsInt(), GetCreditAsInt());
-                this->TimeOut(TIMEOUT_SHORT);
-        }
-        else if (Status == RepayState)
-        {
-                GetDrawer().DrawReplay(GetTimeDelta() / (TIMEOUT_REPAY / HUNDRED_PERCENT));
-                TimeOut(TIMEOUT_REPAY);
-        }
-        else if (Status == DoneState)
-        {
-                GetDrawer().DrawDoneState();
-                TimeOut(TIMEOUT_DEFAULT);
-        }
-        else if (Status == LstUserState)
-        {
-                GetDrawer().DrawLastUser(GetUserHandler().getLastUser());
-                TimeOut(TIMEOUT_DEFAULT);
-        }
-        else if (Status == StopState)
-        {
-                MillOff();
-                SetTimeInStop(millis() - GetTimeStopBegin());
-                GetDrawer().DrawStopState();
-                TimeOut(TIMEOUT_LONG);
-        }
-        else if (Status == FinishState)
-        {
-                int _progress = ((_passedtime + _deltaTime) / (this->T_rest / 100));
-                MillOn();
-                GetDrawer().DisplayProgress(_progress);
-                TimeOut(GetTimeRemaning() - GetTimePassed());
+
+                else if (Status == Double)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DisplayProgress(GetProgress());
+                                SetUpdateDisplay(false);
+                        }
+                        else if (GetProgress() >= GetDisplayedProgress() + PROGRESS_RESOLUTION)
+                        {
+                                GetDrawer().DisplayProgress(GetDisplayedProgress());
+                                SetDisplayedProgress(GetProgress());
+                        }
+                        else
+                        {
+                                SetProgress((GetTimeDelta()) / (GetTimeDouble() / HUNDRED_PERCENT));
+                        }
+
+                        TimeOut(GetTimeDouble());
+                }
+
+                else if (Status == EnterKey)
+                {
+                        if (((GetLocalKey() != GetLocalKeyDisplayed()) || (GetActiveKeyElement() != GetActiveKeyElementDisplayed())) || GetUpdateDisplay())
+                        {
+                                SetLocalKeyDisplayed(GetLocalKey());
+                                SetActiveKeyElementDispayed(GetActiveKeyElement());
+                                GetDrawer().DrawKeyInput(GetLocalKeyDisplayed(), GetActiveKeyElementDisplayed());
+                                SetUpdateDisplay(false);
+                        }
+
+                        TimeOut(TIMEOUT_LONG);
+                }
+
+                else if (Status == FreePullState)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawFreeState();
+                                SetUpdateDisplay(false);
+                        }
+
+                        TimeOut(TIMEOUT_LONG);
+                }
+
+                else if (Status == AdaptTiDouble)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawTime(GetTimeDouble(), true);
+                                SetUpdateDisplay(false);
+                        }
+
+                        TimeOut(TIMEOUT_LONG);
+                }
+
+                else if (Status == AdaptTiSingle)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawTime(GetTimeSingle(), false);
+                                SetUpdateDisplay(false);
+                        }
+
+                        TimeOut(TIMEOUT_LONG);
+                }
+
+                else if (Status == PayOne)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawPayOne();
+                                SetUpdateDisplay(false);
+                        }
+
+                        TimeOut(TIMEOUT_DEFAULT);
+                }
+
+                else if (Status == SceenSaferState)
+                {
+                        GetDrawer().DrawScreenSafer(GetTimeDelta());
+                }
+
+                else if (Status == AskForSplitPayment)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawSplitQ2();
+                                SetUpdateDisplay(false);
+                        }
+                        TimeOut(TIMEOUT_DEFAULT);
+                }
+
+                else if (Status == SelectTiToAdapt)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawTimeSelect();
+                                SetUpdateDisplay(false);
+                        }
+                        TimeOut(TIMEOUT_LONG);
+                }
+
+                else if (Status == PayTwo)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawPay2();
+                                SetUpdateDisplay(false);
+                        }
+                        TimeOut(TIMEOUT_DEFAULT);
+                }
+
+                else if (Status == PayTwo_1)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawPay2_1();
+                                SetUpdateDisplay(false);
+                        }
+                        TimeOut(TIMEOUT_DEFAULT);
+                }
+
+                else if (Status == PayTwo_2)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawPay2_2();
+                                SetUpdateDisplay(false);
+                        }
+                        TimeOutWithBackPay(TIMEOUT_LONG);
+                }
+
+                else if (Status == LowCredit)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawLowCredit();
+                                SetUpdateDisplay(false);
+                        }
+                        TimeOut(TIMEOUT_SHORT);
+                }
+
+                else if (Status == ReadCreditUser)
+                {
+                        SetUserAsInt(GetUserHandler().GetCardId().toInt());
+                        SetCreditAsInt(GetUserHandler().ReadCredit());
+                }
+
+                else if (Status == ShowCredit)
+                {
+                        if (GetUserAsInt() == 0)
+                        {
+                                TimeOut(0);
+                                return;
+                        }
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawCredit(GetUserAsInt(), GetCreditAsInt());
+                                SetUpdateDisplay(false);
+                        }
+                        TimeOut(TIMEOUT_SHORT);
+                }
+                else if (Status == RepayState)
+                {
+                        GetDrawer().DrawReplay(GetTimeDelta() / (TIMEOUT_REPAY / HUNDRED_PERCENT));
+                        TimeOut(TIMEOUT_REPAY);
+                }
+                else if (Status == DoneState)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawDoneState();
+                                SetUpdateDisplay(false);
+                        }
+                        TimeOut(TIMEOUT_DEFAULT);
+                }
+                else if (Status == LstUserState)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawLastUser(GetUserHandler().getLastUser());
+                                SetUpdateDisplay(false);
+                        }
+                        TimeOut(TIMEOUT_DEFAULT);
+                }
+                else if (Status == StopState)
+                {
+                        MillOff();
+                        SetTimeInStop(millis() - GetTimeStopBegin());
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawStopState();
+                                SetUpdateDisplay(false);
+                        }
+                        TimeOut(TIMEOUT_LONG);
+                }
+                else if (Status == FinishState)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DisplayProgress(GetDisplayedProgress());
+                                SetUpdateDisplay(false);
+                        }
+                        else if (GetProgress() >= GetDisplayedProgress() + PROGRESS_RESOLUTION)
+                        {
+                                GetDrawer().DisplayProgress(GetDisplayedProgress());
+                        }
+                        else
+                        {
+                                SetProgress((GetTimePassed() + GetTimeDelta()) / (GetTimeRemaning() / HUNDRED_PERCENT));
+                        }
+
+                        TimeOut(GetTimeRemaning() - GetTimePassed());
+                }
         }
 }
 
@@ -833,10 +1100,12 @@ void Controller::Reset()
         SetCreditAsInt(0);
         SetCurrentKeyFlag(NONE_KEY);
         SetOldKeyFlag(NONE_KEY);
+        SetUpdateDisplay(true);
 }
 
 char Controller::StateBegin(char state)
 {
+        GetUserHandler().ResetInput();
         SetCurrentStatus(state);
         SetStartTime(millis());
         SetCurrentKeyFlag(NONE_KEY);
@@ -844,6 +1113,7 @@ char Controller::StateBegin(char state)
         SetLocalKey(DEFAULT_INT_INI);
         SetActiveKeyElement(DEFAULT_INT_INI);
         UpDateTime();
+        SetUpdateDisplay(true);
         return state;
 }
 

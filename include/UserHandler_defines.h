@@ -42,3 +42,8 @@
 #define TiSingleMax                 20000
 #define TiDoubleMin                 1000
 #define TiDoubleMax                 40000
+
+
+// Delayes
+
+#define DEBOUNCE_KEYS_MS            300
