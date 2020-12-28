@@ -62,7 +62,7 @@
     #define SPLITQ_txt          "Split?"
     #define SPLITQ_y            26
     #define SPLITQ_font         u8g2_font_logisoso16_tr
-    #define SPLITQARROWS_txt    "No | Ja"
+    #define SPLITQARROWS_txt    "N | J"
     #define SPLITQARROWS_y      54
     #define SPLITQARRWOS_font   u8g2_font_logisoso20_tr
 
@@ -129,16 +129,16 @@
     #define KMNEXT_y            44
     #define KMNEXT_font         u8g2_font_logisoso24_tr
 
-    #define KEYINPUT_txt        "Enter Key"
+    #define KEYINPUT_txt        "Passwort"
     #define KEYINPUT_y          21
     #define KEYINPUT_font       u8g2_font_logisoso16_tr
     #define KEY_SELECTOR_y      52
     #define KEY_FONT            u8g2_font_logisoso24_tr
     #define KEY_y               49
 
-    #define EINFACH_txt          "<- Singe"
+    #define EINFACH_txt          "<- Einfach"
     #define EINFACH_y            28
-    #define DOPPELT_txt          "Double ->" 
+    #define DOPPELT_txt          "Doppelt ->" 
     #define DOPPELT_y            52
     #define TIMESELECT_font      u8g2_font_logisoso16_tr
 

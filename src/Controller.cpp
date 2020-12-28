@@ -2,18 +2,18 @@
 #include "UserHandler.h"
 #include "Drawer.h"
 #include "Controller.h"
-#include "defines.h"
+#include "Controller_defines.h"
 #include <ArduinoJson.h>
 #include <WiFi101.h>
 #include <SPI.h>
 #include <WDTZero.h>
 
-Controller ::Controller(int chipSelect, int slaveSelect, int rstPin, int clk, int data) : _drawer(clk, data), _userHandler(chipSelect, slaveSelect, rstPin), _watchDog() {}
+Controller::Controller(int chipSelect, int slaveSelect, int rstPin, int clk, int data) : MillDrawer(clk, data), MillUserHandler(chipSelect, slaveSelect, rstPin), MillWatchDog(), MillWebHandler() {}
 
 //////////////////  Getter and Setter for all variables  ////////////////////////////
 
-void Controller::SetCurrentStatus(char stat) { _currentStatus = stat; }
-char &Controller::GetCurrentStatus() { return _currentStatus; }
+void Controller::SetCurrentStatus(char stat) { currentStatus = stat; }
+char &Controller::GetCurrentStatus() { return currentStatus; }
 
 void Controller::SetCurrentKeyFlag(char key) { this->key = key; }
 char Controller::GetCurrentKeyFlag()
@@ -36,48 +36,49 @@ char Controller::GetCurrentKeyFlag()
         }
 }
 
-void Controller::SetTempKeyFlag(char key) { this->temp_oldKey = key; }
-char &Controller::GetTempKeyFlag() { return this->temp_oldKey; }
+void Controller::SetTempKeyFlag(char key) { this->tempOldKey = key; }
+char &Controller::GetTempKeyFlag() { return this->tempOldKey; }
 
 void Controller::SetOldKeyFlag(char key) { this->oldKey = key; }
 char &Controller::GetOldKeyFlag() { return this->oldKey; }
 
-void Controller::SetStartTime(unsigned long time) { this->_startTime = time; }
-unsigned long &Controller::GetStartTime() { return this->_startTime; }
+void Controller::SetStartTime(unsigned long time) { this->tiStart = time; }
+unsigned long &Controller::GetStartTime() { return this->tiStart; }
 
-void Controller::SetTimeSingle(unsigned long time) { this->T_einfach = time; }
-unsigned long &Controller::GetTimeSingle() { return this->T_einfach; }
+void Controller::SetTimeSingle(unsigned long time) { this->tiSingle = time; }
+unsigned long &Controller::GetTimeSingle() { return this->tiSingle; }
 
-void Controller::SetTimeDouble(unsigned long time) { this->T_doppelt = time; }
-unsigned long &Controller::GetTimeDouble() { return this->T_doppelt; }
+void Controller::SetTimeDouble(unsigned long time) { this->tiDouble = time; }
+unsigned long &Controller::GetTimeDouble() { return this->tiDouble; }
 
-void Controller::SetTimeRemaning(unsigned long time) { this->T_rest = time; }
-unsigned long &Controller::GetTimeRemaning() { return this->T_rest; }
+void Controller::SetTimeRemaning(unsigned long time) { this->tiRemaining = time; }
+unsigned long &Controller::GetTimeRemaning() { return this->tiRemaining; }
 
-void Controller::SetTimePassed(unsigned long time) { this->_passedtime = time; }
-unsigned long &Controller::GetTimePassed() { return this->_passedtime; }
+void Controller::SetTimePassed(unsigned long time) { this->tiPassed = time; }
+unsigned long &Controller::GetTimePassed() { return this->tiPassed; }
 
-void Controller::SetTimeDelta(unsigned long time) { this->_deltaTime = time; }
-unsigned long &Controller::GetTimeDelta() { return this->_deltaTime; }
+void Controller::SetTimeDelta(unsigned long time) { this->tiDelat = time; }
+unsigned long &Controller::GetTimeDelta() { return this->tiDelat; }
 
-void Controller::SetTimeStopBegin(unsigned long time) { this->_stopBegin = time; }
-unsigned long &Controller::GetTimeStopBegin() { return this->_stopBegin; }
+void Controller::SetTimeStopBegin(unsigned long time) { this->tiStopBegin = time; }
+unsigned long &Controller::GetTimeStopBegin() { return this->tiStopBegin; }
 
-void Controller::SetTimeInStop(unsigned long time) { this->_timeInStopState = time; }
-unsigned long &Controller::GetTimeInStop() { return this->_timeInStopState; }
+void Controller::SetTimeInStop(unsigned long time) { this->tiInStopState = time; }
+unsigned long &Controller::GetTimeInStop() { return this->tiInStopState; }
 
 void Controller::SetCurrentUser(String userID) { this->_currentUser = userID; }
 String &Controller::GetCurrentUser() { return this->_currentUser; }
 
-UserHandler &Controller::GetUserHandler() { return this->_userHandler; }
-Drawer &Controller::GetDrawer() { return this->_drawer; }
-WDTZero &Controller::GetWatchDog() { return this->_watchDog; }
+UserHandler &Controller::GetUserHandler() { return this->MillUserHandler; }
+Drawer &Controller::GetDrawer() { return this->MillDrawer; }
+WDTZero &Controller::GetWatchDog() { return this->MillWatchDog; }
+WebHandler &Controller::GetWebHandler() {return this->MillWebHandler;}
 
-int &Controller::GetUserAsInt() { return this->credit; }
-void Controller::SetUserAsInt(int credit) { this->credit = credit; }
+int &Controller::GetUserAsInt() { return this->activeCredit; }
+void Controller::SetUserAsInt(int credit) { this->activeCredit = credit; }
 
-int &Controller::GetCreditAsInt() { return this->user; }
-void Controller::SetCreditAsInt(int user) { this->user = user; }
+int &Controller::GetCreditAsInt() { return this->activeUser; }
+void Controller::SetCreditAsInt(int user) { this->activeUser = user; }
 
 int &Controller::GetActiveKeyElement() { return this->activeKeyElement; }
 void Controller::SetActiveKeyElement(int element)
@@ -92,44 +93,44 @@ void Controller::SetActiveKeyElement(int element)
 int &Controller::GetLocalKey() { return this->localKey; }
 void Controller::SetLocalKey(int key) { this->localKey = key; }
 
-int &Controller::GetLocalKeyDisplayed() { return this->localKey_displayed; }
-void Controller::SetLocalKeyDisplayed(int key) { this->localKey_displayed = key; }
+int &Controller::GetLocalKeyDisplayed() { return this->localKeyDisplayed; }
+void Controller::SetLocalKeyDisplayed(int key) { this->localKeyDisplayed = key; }
 
-int &Controller::GetActiveKeyElementDisplayed() { return this->activeKeyElement_displayed; }
-void Controller::SetActiveKeyElementDispayed(int element) { this->activeKeyElement_displayed = element; }
+int &Controller::GetActiveKeyElementDisplayed() { return this->activeKeyElementDisplayed; }
+void Controller::SetActiveKeyElementDispayed(int element) { this->activeKeyElementDisplayed = element; }
 
-unsigned long &Controller::GetTiRight() { return this->_ti_r_down; }
-void Controller::SetTiRight(unsigned long ti) { this->_ti_r_down = ti; }
+unsigned long &Controller::GetTiRight() { return this->tiRightDown; }
+void Controller::SetTiRight(unsigned long ti) { this->tiRightDown = ti; }
 
-unsigned long &Controller::GetTiLeft() { return this->_ti_l_down; }
-void Controller::SetTiLeft(unsigned long ti) { this->_ti_l_down = ti; }
+unsigned long &Controller::GetTiLeft() { return this->tiLeftDown; }
+void Controller::SetTiLeft(unsigned long ti) { this->tiLeftDown = ti; }
 
-unsigned long &Controller::GetTiBoth() { return this->_ti_both_down; }
-void Controller::SetTiBoth(unsigned long ti) { this->_ti_both_down = ti; }
+unsigned long &Controller::GetTiBoth() { return this->tiBothDown; }
+void Controller::SetTiBoth(unsigned long ti) { this->tiBothDown = ti; }
 
-unsigned long &Controller::GetTimer100ms() { return this->timer100ms; }
-void Controller::SetTimer100ms(unsigned long ti) { this->timer100ms = ti; }
+unsigned long &Controller::GetTimer100ms() { return this->tiTimer100ms; }
+void Controller::SetTimer100ms(unsigned long ti) { this->tiTimer100ms = ti; }
 
-unsigned long &Controller::GetTimer50ms() { return this->timer10ms; }
-void Controller::SetTimer50ms(unsigned long ti) { this->timer10ms = ti; }
+unsigned long &Controller::GetTimer50ms() { return this->tiTimer50ms; }
+void Controller::SetTimer50ms(unsigned long ti) { this->tiTimer50ms = ti; }
 
-unsigned long &Controller::GetDeltaTiRight() { return this->_delta_ti_r_down; }
-void Controller::SetDeltaTiRight(unsigned long ti) { this->_delta_ti_r_down = ti; }
+unsigned long &Controller::GetDeltaTiRight() { return this->tiDeltaRightDown; }
+void Controller::SetDeltaTiRight(unsigned long ti) { this->tiDeltaRightDown = ti; }
 
-unsigned long &Controller::GetDeltaTiLeft() { return this->_delta_ti_l_down; }
-void Controller::SetDeltaTiLeft(unsigned long ti) { this->_delta_ti_l_down = ti; }
+unsigned long &Controller::GetDeltaTiLeft() { return this->tiDeltaLeftDown; }
+void Controller::SetDeltaTiLeft(unsigned long ti) { this->tiDeltaLeftDown = ti; }
 
-unsigned long &Controller::GetDeltaTiBoth() { return this->_delta_ti_both_down; }
-void Controller::SetDeltaTiBoth(unsigned long ti) { this->_delta_ti_both_down = ti; }
+unsigned long &Controller::GetDeltaTiBoth() { return this->tiDeltaBothDown; }
+void Controller::SetDeltaTiBoth(unsigned long ti) { this->tiDeltaBothDown = ti; }
 
 bool &Controller::GetUpdateDisplay() { return this->updateDisplay; }
 void Controller::SetUpdateDisplay(bool st) { this->updateDisplay = st; }
 
-int &Controller::GetDisplayedProgress() { return this->progress; }
-void Controller::SetDisplayedProgress(int prog) { this->progress = prog; }
+int &Controller::GetDisplayedProgress() { return this->activeProgress; }
+void Controller::SetDisplayedProgress(int prog) { this->activeProgress = prog; }
 
-int &Controller::GetProgress() { return this->progress_temp; }
-void Controller::SetProgress(int prog) { this->progress_temp = prog; }
+int &Controller::GetProgress() { return this->tempProgress; }
+void Controller::SetProgress(int prog) { this->tempProgress = prog; }
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -174,12 +175,14 @@ char Controller::tr_EnterKey()
         {
                 SetActiveKeyElement(GetActiveKeyElement() + 1);
                 GetUserHandler().ResetInput();
+                SetUpdateDisplay(true);
                 return (EnterKey);
         }
         else if (GetCurrentKeyFlag() == RIGHT_KEY)
         {
                 SetLocalKey(GetLocalKey() ^= 1UL << GetActiveKeyElement());
                 GetUserHandler().ResetInput();
+                SetUpdateDisplay(true);
                 return (EnterKey);
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
@@ -266,6 +269,7 @@ char Controller::tr_Single()
                 SetTimePassed(GetTimeDelta());
                 SetTimeStopBegin(millis());
                 SetTimeInStop(NO_TIME);
+                MillOff();
                 return StateBegin(StopState);
         }
         else if (GetCurrentKeyFlag() == RIGHT_KEY)
@@ -274,6 +278,7 @@ char Controller::tr_Single()
                 SetTimePassed(GetTimeDelta());
                 SetTimeStopBegin(millis());
                 SetTimeInStop(NO_TIME);
+                MillOff();
                 return StateBegin(StopState);
         }
         else
@@ -289,6 +294,7 @@ char Controller::tr_Dobule()
                 SetTimePassed(GetTimeDelta());
                 SetTimeStopBegin(millis());
                 SetTimeInStop(NO_TIME);
+                MillOff();
                 return StateBegin(StopState);
         }
         else if (GetCurrentKeyFlag() == RIGHT_KEY)
@@ -297,6 +303,7 @@ char Controller::tr_Dobule()
                 SetTimePassed(GetTimeDelta());
                 SetTimeStopBegin(millis());
                 SetTimeInStop(NO_TIME);
+                MillOff();
                 return StateBegin(StopState);
         }
         else
@@ -311,6 +318,7 @@ char Controller::tr_FinishState()
                 SetTimePassed(GetTimeDelta() + GetTimePassed());
                 SetTimeStopBegin(millis());
                 SetTimeInStop(NO_TIME);
+                MillOff();
                 return StateBegin(StopState);
         }
         else if (GetCurrentKeyFlag() == RIGHT_KEY)
@@ -318,6 +326,7 @@ char Controller::tr_FinishState()
                 SetTimePassed(GetTimeDelta() + GetTimePassed());
                 SetTimeStopBegin(millis());
                 SetTimeInStop(NO_TIME);
+                MillOff();
                 return StateBegin(StopState);
         }
         else
@@ -570,8 +579,8 @@ char Controller::tr_PayTwo_1()
 
                 if (_credit >= PRICE_SINGE)
                 {
-                        _userHandler.WriteCredit(_credit - PRICE_SINGE, false);
-                        _userHandler.newRead();
+                        MillUserHandler.WriteCredit(_credit - PRICE_SINGE, false);
+                        MillUserHandler.newRead();
                         while (GetCurrentUser() == ZERO_STRING || GetCurrentUser() == "")
                         {
                                 SetCurrentUser(GetUserHandler().GetCardId());
@@ -686,11 +695,17 @@ void Controller::Begin()
         // Draw the startup animation
         GetDrawer().DrawMain();
 
-        // Setup watchdog time to 2s. One cycle is around 300ms
+        // Setup watchdog time to 2s. One cycle is around 30ms
         GetWatchDog().setup(WDT_HARDCYCLE2S);
 
         // Draw initial screen
         SetUpdateDisplay(true);
+
+        // If ServerOn is 1 - Start the webserver for adational functionality
+        if (byte(GetUserHandler().config.ServerOn))
+        {
+                GetWebHandler().Begin(GetUserHandler().config.PW,GetUserHandler().config.SSID);
+        }
 }
 
 void Controller::ProcessInput()
@@ -811,7 +826,7 @@ char Controller::StateTransitions()
 
 bool Controller::TimeOut(unsigned long time)
 {
-        if (_deltaTime >= time)
+        if (tiDelat >= time)
         {
                 this->Reset();
                 return true;
@@ -835,15 +850,17 @@ void Controller::UpDateTime()
         SetTimeDelta(millis() - GetStartTime());
 }
 
-void Controller::States(char Status)
+void Controller::States(char state)
 {
+        GetWebHandler().Run();
+        
         if ((millis() - GetTimer100ms()) > TASK_100MS)
         {
                 SetTimer100ms(millis());
 
                 ProcessInput();
 
-                if (Status == WaitForUser)
+                if (state == WaitForUser)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -852,7 +869,7 @@ void Controller::States(char Status)
                         }
                 }
 
-                else if (Status == Single)
+                else if (state == Single)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -872,7 +889,7 @@ void Controller::States(char Status)
                         TimeOut(GetTimeSingle());
                 }
 
-                else if (Status == Double)
+                else if (state == Double)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -892,9 +909,29 @@ void Controller::States(char Status)
                         TimeOut(GetTimeDouble());
                 }
 
-                else if (Status == EnterKey)
+                else if (state == FinishState)
                 {
-                        if (((GetLocalKey() != GetLocalKeyDisplayed()) || (GetActiveKeyElement() != GetActiveKeyElementDisplayed())) || GetUpdateDisplay())
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DisplayProgress(GetProgress());
+                                SetUpdateDisplay(false);
+                        }
+                        else if (GetProgress() >= GetDisplayedProgress() + PROGRESS_RESOLUTION)
+                        {
+                                GetDrawer().DisplayProgress(GetDisplayedProgress());
+                                SetDisplayedProgress(GetProgress());
+                        }
+                        else
+                        {
+                                SetProgress((GetTimePassed() + GetTimeDelta()) / (GetTimeRemaning() / HUNDRED_PERCENT));
+                        }
+
+                        TimeOut(GetTimeRemaning() - GetTimePassed());
+                }
+
+                else if (state == EnterKey)
+                {
+                        if (GetUpdateDisplay())
                         {
                                 SetLocalKeyDisplayed(GetLocalKey());
                                 SetActiveKeyElementDispayed(GetActiveKeyElement());
@@ -905,7 +942,7 @@ void Controller::States(char Status)
                         TimeOut(TIMEOUT_LONG);
                 }
 
-                else if (Status == FreePullState)
+                else if (state == FreePullState)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -916,7 +953,7 @@ void Controller::States(char Status)
                         TimeOut(TIMEOUT_LONG);
                 }
 
-                else if (Status == AdaptTiDouble)
+                else if (state == AdaptTiDouble)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -927,7 +964,7 @@ void Controller::States(char Status)
                         TimeOut(TIMEOUT_LONG);
                 }
 
-                else if (Status == AdaptTiSingle)
+                else if (state == AdaptTiSingle)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -938,7 +975,7 @@ void Controller::States(char Status)
                         TimeOut(TIMEOUT_LONG);
                 }
 
-                else if (Status == PayOne)
+                else if (state == PayOne)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -949,12 +986,12 @@ void Controller::States(char Status)
                         TimeOut(TIMEOUT_DEFAULT);
                 }
 
-                else if (Status == SceenSaferState)
+                else if (state == SceenSaferState)
                 {
                         GetDrawer().DrawScreenSafer(GetTimeDelta());
                 }
 
-                else if (Status == AskForSplitPayment)
+                else if (state == AskForSplitPayment)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -964,7 +1001,7 @@ void Controller::States(char Status)
                         TimeOut(TIMEOUT_DEFAULT);
                 }
 
-                else if (Status == SelectTiToAdapt)
+                else if (state == SelectTiToAdapt)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -974,7 +1011,7 @@ void Controller::States(char Status)
                         TimeOut(TIMEOUT_LONG);
                 }
 
-                else if (Status == PayTwo)
+                else if (state == PayTwo)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -984,7 +1021,7 @@ void Controller::States(char Status)
                         TimeOut(TIMEOUT_DEFAULT);
                 }
 
-                else if (Status == PayTwo_1)
+                else if (state == PayTwo_1)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -994,7 +1031,7 @@ void Controller::States(char Status)
                         TimeOut(TIMEOUT_DEFAULT);
                 }
 
-                else if (Status == PayTwo_2)
+                else if (state == PayTwo_2)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -1004,7 +1041,7 @@ void Controller::States(char Status)
                         TimeOutWithBackPay(TIMEOUT_LONG);
                 }
 
-                else if (Status == LowCredit)
+                else if (state == LowCredit)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -1014,13 +1051,13 @@ void Controller::States(char Status)
                         TimeOut(TIMEOUT_SHORT);
                 }
 
-                else if (Status == ReadCreditUser)
+                else if (state == ReadCreditUser)
                 {
                         SetUserAsInt(GetUserHandler().GetCardId().toInt());
                         SetCreditAsInt(GetUserHandler().ReadCredit());
                 }
 
-                else if (Status == ShowCredit)
+                else if (state == ShowCredit)
                 {
                         if (GetUserAsInt() == 0)
                         {
@@ -1034,12 +1071,12 @@ void Controller::States(char Status)
                         }
                         TimeOut(TIMEOUT_SHORT);
                 }
-                else if (Status == RepayState)
+                else if (state == RepayState)
                 {
                         GetDrawer().DrawReplay(GetTimeDelta() / (TIMEOUT_REPAY / HUNDRED_PERCENT));
                         TimeOut(TIMEOUT_REPAY);
                 }
-                else if (Status == DoneState)
+                else if (state == DoneState)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -1048,7 +1085,7 @@ void Controller::States(char Status)
                         }
                         TimeOut(TIMEOUT_DEFAULT);
                 }
-                else if (Status == LstUserState)
+                else if (state == LstUserState)
                 {
                         if (GetUpdateDisplay())
                         {
@@ -1057,9 +1094,8 @@ void Controller::States(char Status)
                         }
                         TimeOut(TIMEOUT_DEFAULT);
                 }
-                else if (Status == StopState)
+                else if (state == StopState)
                 {
-                        MillOff();
                         SetTimeInStop(millis() - GetTimeStopBegin());
                         if (GetUpdateDisplay())
                         {
@@ -1068,23 +1104,14 @@ void Controller::States(char Status)
                         }
                         TimeOut(TIMEOUT_LONG);
                 }
-                else if (Status == FinishState)
+                else
                 {
                         if (GetUpdateDisplay())
                         {
-                                GetDrawer().DisplayProgress(GetDisplayedProgress());
+                                GetDrawer().Err();
                                 SetUpdateDisplay(false);
                         }
-                        else if (GetProgress() >= GetDisplayedProgress() + PROGRESS_RESOLUTION)
-                        {
-                                GetDrawer().DisplayProgress(GetDisplayedProgress());
-                        }
-                        else
-                        {
-                                SetProgress((GetTimePassed() + GetTimeDelta()) / (GetTimeRemaning() / HUNDRED_PERCENT));
-                        }
-
-                        TimeOut(GetTimeRemaning() - GetTimePassed());
+                        TimeOut(TIMEOUT_SHORT);
                 }
         }
 }

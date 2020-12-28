@@ -1,7 +1,7 @@
 #include "Arduino.h"
 #include "Drawer.h"
 #include <U8g2lib.h>
-#include "display_defines.h"
+#include "Drawer_defines.h"
 
 #ifdef SIXTYFOUR
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C &Drawer::GetDisplay() { return _display; }

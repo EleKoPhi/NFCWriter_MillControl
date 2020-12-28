@@ -83,7 +83,6 @@ public:
         static void StartKeyDebounce();
         static bool DebounceFinished(unsigned long time);
 
-
         ////////////// GETTER AND SETTER END ///////////////////
 
 private:
