@@ -1,3 +1,6 @@
+#ifndef UserHandler_defines
+#define UserHandler_defines
+
 // FILE NAMES
 
 #define CONFIG_FILE                 "CONFIG.TXT"
@@ -47,3 +50,6 @@
 // Delayes
 
 #define DEBOUNCE_KEYS_MS            300
+
+
+#endif

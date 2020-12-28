@@ -148,6 +148,9 @@ public:
     bool &GetUpdateDisplay();
     void SetUpdateDisplay(bool st);
 
+    bool &GetWebHandlerActive();
+    void SetWebHandlerActive(bool st);
+
     int &GetDisplayedProgress();
     void SetDisplayedProgress(int progress);
 
@@ -163,6 +166,7 @@ private:
     String _currentUser;
 
     bool updateDisplay = true;
+    bool webHandlerActive = false;
 
     char currentStatus;
     char key;

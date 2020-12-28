@@ -1,3 +1,6 @@
+#ifndef UserHandler_defines
+#define UserHandler_defines
+
 #define SPACE                   " "
 #define UNDERSCORE              "_"
 
@@ -289,4 +292,5 @@
     #define TIMESELECT_font      u8g2_font_logisoso16_tr
     /* TODO */
 
+#endif
 #endif

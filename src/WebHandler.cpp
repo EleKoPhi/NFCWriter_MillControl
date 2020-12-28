@@ -1,7 +1,13 @@
 #include "WebHandler.h"
 #include "WebHandler_defines.h"
 
-WebHandler::WebHandler() : millserver(SERVER_PORT), millClient() {}
+#include <SD.h>
+#include <SPI.h>
+
+WebHandler::WebHandler(int sdPin) : millserver(SERVER_PORT), millClient()
+{
+        chipSelectSd = sdPin;
+}
 
 void WebHandler::SetInputBuffer(String str) { this->InputBuffer = str; };
 String WebHandler::GetInputBuffer() { return this->InputBuffer; };
@@ -9,8 +15,15 @@ void WebHandler::ClearInputBuffer() { this->InputBuffer = ""; };
 void WebHandler::SetInput(char c) { this->input = c; };
 char WebHandler::GetInput() { return this->input; };
 
+void WebHandler::SetCurrentStatus(char stat) { currentStatus = stat; }
+char &WebHandler::GetCurrentStatus() { return currentStatus; }
+
 unsigned long WebHandler::GetServerWatchDogTimer() { return serverWatchDogTimer; };
-void WebHandler::SetServerWatchDogTimer(unsigned long time) { this->serverWatchDogTimer = time; }
+void WebHandler::StartServerWatchDog()
+{
+        SetWasTimeOut(false);
+        this->serverWatchDogTimer = millis();
+}
 bool WebHandler::IsTimeOut(unsigned long time)
 {
         return (millis() - GetServerWatchDogTimer()) > time;
@@ -18,6 +31,71 @@ bool WebHandler::IsTimeOut(unsigned long time)
 
 void WebHandler::SetWasTimeOut(bool st) { this->wasTimeOut = st; }
 bool WebHandler::GetWasTimeOut() { return this->wasTimeOut; }
+
+void WebHandler::SetWebHandlerActive(bool st) { this->webHandlerActive = st; }
+bool WebHandler::GetWebHandlerActive() { return this->webHandlerActive; }
+
+void WebHandler::SetProgressForHttps(int localProgress) { progress = localProgress; }
+int WebHandler::GetProgressForHttps() { return progress; }
+
+String WebHandler::FormatMain(bool Single, bool Double, bool FreePull, bool RetrunKey)
+{
+        String htmlInitial = PAGE_MAIN;
+
+        if (RetrunKey)
+        {
+                htmlInitial.replace(RETUNN_KEY_FLAG, RETURN_KEY);
+
+                htmlInitial.replace(SINGLE_BUTTON_START, HTML_CROSSED_OUT_START);
+                htmlInitial.replace(SINGLE_BUTTON_END, HTML_CROSSED_OUT_END);
+
+                htmlInitial.replace(DOBULE_BUTTON_START, HTML_CROSSED_OUT_START);
+                htmlInitial.replace(DOBULE_BUTTON_END, HTML_CROSSED_OUT_END);
+
+                htmlInitial.replace(FREEPULL_BUTTON_START, HTML_CROSSED_OUT_START);
+                htmlInitial.replace(FREEPULL_BUTTON_END, HTML_CROSSED_OUT_END);
+
+        }
+        else
+        {
+                if (Single)
+                {
+                        htmlInitial.replace(SINGLE_BUTTON_START, HTML_UNDERLINED_START);
+                        htmlInitial.replace(SINGLE_BUTTON_END, HTML_UNDELINED_END);
+                }
+                else
+                {
+                        htmlInitial.replace(SINGLE_BUTTON_START, HTML_CROSSED_OUT_START);
+                        htmlInitial.replace(SINGLE_BUTTON_END, HTML_CROSSED_OUT_END);
+                }
+
+                if (Double)
+                {
+                        htmlInitial.replace(DOBULE_BUTTON_START, HTML_UNDERLINED_START);
+                        htmlInitial.replace(DOBULE_BUTTON_END, HTML_UNDELINED_END);
+                }
+                else
+                {
+                        htmlInitial.replace(DOBULE_BUTTON_START, HTML_CROSSED_OUT_START);
+                        htmlInitial.replace(DOBULE_BUTTON_END, HTML_CROSSED_OUT_END);
+                }
+
+                if (FreePull)
+                {
+                        htmlInitial.replace(FREEPULL_BUTTON_START, HTML_UNDERLINED_START);
+                        htmlInitial.replace(FREEPULL_BUTTON_END, HTML_UNDELINED_END);
+                }
+                else
+                {
+                        htmlInitial.replace(FREEPULL_BUTTON_START, HTML_CROSSED_OUT_START);
+                        htmlInitial.replace(FREEPULL_BUTTON_END, HTML_CROSSED_OUT_END);
+                }
+
+                htmlInitial.replace(RETUNN_KEY_FLAG, "");
+        }
+
+        return htmlInitial;
+}
 
 bool WebHandler::Begin(String pw, String ssid)
 {
@@ -35,16 +113,20 @@ void WebHandler::Run()
 
         if (millClient)
         {
+
                 if (!GetWasTimeOut())
                 {
-                        Serial.println("Clear buffer");
                         ClearInputBuffer();
+                        millClient.println(HTTP_STATUS);
+                        millClient.println(CONNTENT_TYPE);
+                        millClient.println(REFRESH_RATE);
+                        millClient.println(CONNCECTION_TYPE);
+                        millClient.println();
                 }
 
-                SetServerWatchDogTimer(millis());
-                SetWasTimeOut(false);
+                StartServerWatchDog();
 
-                while (millClient.connected())
+                while (millClient.available())
                 {
                         if (IsTimeOut(SERVER_TIMEOUT))
                         {
@@ -52,15 +134,7 @@ void WebHandler::Run()
                                 break;
                         }
 
-                        if (millClient.available())
-                        {
-                                ProcressInput();
-                        }
-
-                        if (GetInputBuffer().endsWith("keep-alive"))
-                        {
-                                break;
-                        };
+                        ProcressInput();
                 }
 
                 if (!GetWasTimeOut())
@@ -73,39 +147,106 @@ void WebHandler::Run()
 
 void WebHandler::ProcessOutput()
 {
-        Serial.println(GetInputBuffer());
-        if (GetInputBuffer().indexOf("GET /S") != -1)
+        if ((GetInputBuffer().indexOf(PAGE_MAIN_GETBACKKEY) != -1))
         {
-                millClient.println("HTTP/1.1 200 OK");
-                millClient.println("Content-type:text/html");
-                millClient.println();
-                millClient.print("<!doctype html> <html lang=\"en\"> <head> <style> .column { box-sizing: inherit; display: inline-block; margin-bottom: 0em; margin-top: 0em; vertical-align: middle; width: 100%; } .margin-top { margin-top: 1.6rem; } .centered { box-sizing: inherit; text-align: center; } .btn { -webkit-tap-highlight-color: transparent; background-color: #00bd9a; border-radius: 10px; box-shadow: rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px, rgba(0, 0, 0, 0.2) 0px 3px 1px -2px; box-sizing: inherit; color: white; cursor: pointer; display: inline-block; height: 200px; letter-spacing: 3px; line-height: 200px; padding: 0px 1rem; pointer-events: all; position: relative; text-decoration-line: none; text-transform: uppercase; vertical-align: middle; width: 80%; font-size: 30px; } </style> <meta charset=\"utf-8\"> <meta name=\"Homepage\" content=\"Starting page for the survey website \"> <title> Survey HomePage</title> </head> <body> <div class=\"column\"> <div class=\"margin-top centered\"> <a class=\"btn\" href=\"/S\" style=\"\"> Einfacher Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"D\" style=\"\"> Doppelter Bezug </a> </div> <br> <div class=\"centered\"> <a class=\"btn\" href=\"V\" style=\"\"> Freibezug </a> </div> </body> </html>");
-                millClient.println();
-                Serial.println("Einfach");
-                return;
+                SetWebHandlerActive(false);
+                SetCurrentStatus(WaitForUser);
+        }
+
+        if ((GetInputBuffer().indexOf(PAGE_MAIN_GETKEY) != -1) || (GetInputBuffer().indexOf(PAGE_MAIN_GETBACKKEY) != -1))
+        {
+                if (GetCurrentStatus() == Single)
+                {
+                        millClient.print(FormatMain(true, false, false, GetWebHandlerActive()));
+                }
+                else if (GetCurrentStatus() == Double)
+                {
+                        millClient.print(FormatMain(false, true, false, GetWebHandlerActive()));
+                }
+                else if (GetCurrentStatus() == FreePullState)
+                {
+                        millClient.print(FormatMain(false, false, true, GetWebHandlerActive()));
+                }
+                else
+                {
+                        millClient.print(FormatMain(true, true, true, GetWebHandlerActive()));
+                        SetCurrentStatus(WaitForUser);
+                }
+        }
+        else if (GetInputBuffer().indexOf(PAGE_SINGE_GETKEY) != -1)
+        {
+                if (GetCurrentStatus() == Single)
+                {
+                        millClient.print(FormatMain(true, false, false, GetWebHandlerActive()));
+                }
+                else if (GetCurrentStatus() == Double)
+                {
+                        millClient.print(FormatMain(false, true, false, GetWebHandlerActive()));
+                }
+                else if (GetCurrentStatus() == FreePullState)
+                {
+                        millClient.print(FormatMain(false, false, true, GetWebHandlerActive()));
+                }
+                else
+                {
+                        millClient.print(FormatMain(true, false, false, GetWebHandlerActive()));
+                        SetCurrentStatus(Single);
+                }
+        }
+        else if (GetInputBuffer().indexOf(PAGE_DOUBLE_GETKEY) != -1)
+        {
+                if (GetCurrentStatus() == Single)
+                {
+                        millClient.print(FormatMain(true, false, false, GetWebHandlerActive()));
+                }
+                else if (GetCurrentStatus() == Double)
+                {
+                        millClient.print(FormatMain(false, true, false, GetWebHandlerActive()));
+                }
+                else if (GetCurrentStatus() == FreePullState)
+                {
+                        millClient.print(FormatMain(false, false, true, GetWebHandlerActive()));
+                }
+                else
+                {
+                        millClient.print(FormatMain(false, true, false, GetWebHandlerActive()));
+                        SetCurrentStatus(Double);
+                }
+        }
+        else if (GetInputBuffer().indexOf(PAGE_FREEPULL_GETKEY) != -1)
+        {
+                if (GetCurrentStatus() == Single)
+                {
+                        millClient.print(FormatMain(true, false, false, GetWebHandlerActive()));
+                }
+                else if (GetCurrentStatus() == Double)
+                {
+                        millClient.print(FormatMain(false, true, false, GetWebHandlerActive()));
+                }
+                else if (GetCurrentStatus() == FreePullState)
+                {
+                        millClient.print(FormatMain(false, false, true, GetWebHandlerActive()));
+                }
+                else
+                {
+                        millClient.print(FormatMain(false, false, true, GetWebHandlerActive()));
+                        SetCurrentStatus(FreePullState);
+                }
         }
         else
         {
-                millClient.println("HTTP/1.1 200 OK");
-                millClient.println("Content-type:text/html");
-                millClient.println();
-                millClient.println("<div id=\"main\"> <div class=\"fof\"> <h1>Error 404 Page not found... dont call me</h1> </div> </div>");
-                millClient.println();
-                Serial.println("404");
-                return;
+                millClient.print(PAGE_404);
         }
+
+        millClient.println();
+        return;
 }
+
 char WebHandler::ProcressInput()
 {
         SetInput(millClient.read());
 
-        if (GetInput() == -1)
-                return false;
-        else if (GetInput() == '\n')
-        {
-                /* code */
-        }
-        else if (GetInput() != '\r')
+        if (GetInput() != CARRIAGE_RETURN)
         {
                 SetInputBuffer(GetInputBuffer() + GetInput());
                 return true;

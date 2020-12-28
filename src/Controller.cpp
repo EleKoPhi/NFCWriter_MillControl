@@ -8,7 +8,7 @@
 #include <SPI.h>
 #include <WDTZero.h>
 
-Controller::Controller(int chipSelect, int slaveSelect, int rstPin, int clk, int data) : MillDrawer(clk, data), MillUserHandler(chipSelect, slaveSelect, rstPin), MillWatchDog(), MillWebHandler() {}
+Controller::Controller(int chipSelect, int slaveSelect, int rstPin, int clk, int data) : MillDrawer(clk, data), MillUserHandler(chipSelect, slaveSelect, rstPin), MillWatchDog(), MillWebHandler(chipSelect) {}
 
 //////////////////  Getter and Setter for all variables  ////////////////////////////
 
@@ -72,7 +72,7 @@ String &Controller::GetCurrentUser() { return this->_currentUser; }
 UserHandler &Controller::GetUserHandler() { return this->MillUserHandler; }
 Drawer &Controller::GetDrawer() { return this->MillDrawer; }
 WDTZero &Controller::GetWatchDog() { return this->MillWatchDog; }
-WebHandler &Controller::GetWebHandler() {return this->MillWebHandler;}
+WebHandler &Controller::GetWebHandler() { return this->MillWebHandler; }
 
 int &Controller::GetUserAsInt() { return this->activeCredit; }
 void Controller::SetUserAsInt(int credit) { this->activeCredit = credit; }
@@ -131,6 +131,9 @@ void Controller::SetDisplayedProgress(int prog) { this->activeProgress = prog; }
 
 int &Controller::GetProgress() { return this->tempProgress; }
 void Controller::SetProgress(int prog) { this->tempProgress = prog; }
+
+bool &Controller::GetWebHandlerActive() { return this->webHandlerActive; }
+void Controller::SetWebHandlerActive(bool st) { this->webHandlerActive = st; }
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -363,6 +366,10 @@ char Controller::tr_FreePullState()
         {
                 MillOn();
                 return StateBegin(Double);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(WaitForUser);
         }
         else
         {
@@ -704,7 +711,7 @@ void Controller::Begin()
         // If ServerOn is 1 - Start the webserver for adational functionality
         if (byte(GetUserHandler().config.ServerOn))
         {
-                GetWebHandler().Begin(GetUserHandler().config.PW,GetUserHandler().config.SSID);
+                GetWebHandler().Begin(GetUserHandler().config.PW, GetUserHandler().config.SSID);
         }
 }
 
@@ -773,6 +780,24 @@ char Controller::StateTransitions()
         if ((millis() - GetTimer50ms()) > TASK_50MS)
         {
                 SetTimer50ms(millis());
+
+                if (!GetWebHandler().GetWebHandlerActive())
+                {
+                        switch (GetWebHandler().GetCurrentStatus())
+                        {
+                        case Single:
+                                GetWebHandler().SetWebHandlerActive(true);
+                                return StateBegin(Single);
+                        case Double:
+                                GetWebHandler().SetWebHandlerActive(true);
+                                return StateBegin(Double);
+                        case FreePullState:
+                                GetWebHandler().SetWebHandlerActive(true);
+                                return StateBegin(FreePullState);
+                        default:
+                                GetWebHandler().SetWebHandlerActive(false);
+                        }
+                }
 
                 switch (GetCurrentStatus())
                 {
@@ -853,7 +878,7 @@ void Controller::UpDateTime()
 void Controller::States(char state)
 {
         GetWebHandler().Run();
-        
+
         if ((millis() - GetTimer100ms()) > TASK_100MS)
         {
                 SetTimer100ms(millis());
@@ -866,6 +891,7 @@ void Controller::States(char state)
                         {
                                 GetDrawer().DrawWaitForUser();
                                 SetUpdateDisplay(false);
+                                GetWebHandler().SetCurrentStatus(WaitForUser);
                         }
                 }
 
@@ -873,6 +899,7 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
+                                GetWebHandler().SetCurrentStatus(Single);
                                 GetDrawer().DisplayProgress(GetProgress());
                                 SetUpdateDisplay(false);
                         }
@@ -884,6 +911,7 @@ void Controller::States(char state)
                         else
                         {
                                 SetProgress((GetTimeDelta()) / (GetTimeSingle() / HUNDRED_PERCENT));
+                                GetWebHandler().SetProgressForHttps(GetProgress());
                         }
 
                         TimeOut(GetTimeSingle());
@@ -893,6 +921,7 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
+                                GetWebHandler().SetCurrentStatus(Double);
                                 GetDrawer().DisplayProgress(GetProgress());
                                 SetUpdateDisplay(false);
                         }
@@ -904,6 +933,7 @@ void Controller::States(char state)
                         else
                         {
                                 SetProgress((GetTimeDelta()) / (GetTimeDouble() / HUNDRED_PERCENT));
+                                GetWebHandler().SetProgressForHttps(GetProgress());
                         }
 
                         TimeOut(GetTimeDouble());
@@ -924,6 +954,7 @@ void Controller::States(char state)
                         else
                         {
                                 SetProgress((GetTimePassed() + GetTimeDelta()) / (GetTimeRemaning() / HUNDRED_PERCENT));
+                                GetWebHandler().SetProgressForHttps(GetProgress());
                         }
 
                         TimeOut(GetTimeRemaning() - GetTimePassed());
@@ -1132,6 +1163,8 @@ void Controller::Reset()
 
 char Controller::StateBegin(char state)
 {
+        SetDisplayedProgress(DEFAULT_INT_INI);
+        SetProgress(DEFAULT_INT_INI);
         GetUserHandler().ResetInput();
         SetCurrentStatus(state);
         SetStartTime(millis());

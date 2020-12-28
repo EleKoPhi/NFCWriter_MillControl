@@ -1,3 +1,6 @@
+#ifndef Controller_defines
+#define Controller_defines
+
 // COMPILER DEFINES 
 
 #define DEBUG
@@ -97,3 +100,4 @@ enum MillStates
 	SelectTiToAdapt			= 	25
 };
 
+#endif
