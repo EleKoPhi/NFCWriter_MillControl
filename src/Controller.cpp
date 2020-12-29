@@ -943,6 +943,8 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
+                                SetProgress((GetTimePassed() + GetTimeDelta()) / (GetTimeRemaning() / HUNDRED_PERCENT));
+                                SetDisplayedProgress(GetProgress());
                                 GetDrawer().DisplayProgress(GetProgress());
                                 SetUpdateDisplay(false);
                         }
@@ -1139,6 +1141,7 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
+                                Serial.println(int(GetCurrentStatus()));
                                 GetDrawer().Err();
                                 SetUpdateDisplay(false);
                         }
