@@ -41,10 +41,10 @@
 
 // MIN MAX TIMES
 
-#define TiSingleMin                 1000
-#define TiSingleMax                 20000
-#define TiDoubleMin                 1000
-#define TiDoubleMax                 40000
+#define TI_SINGLE_MIN               1000
+#define TI_SINGLE_MAX               20000
+#define TI_DOUBLE_MIN               1000
+#define TI_DOUBLE_MAX               40000
 
 
 // Delayes

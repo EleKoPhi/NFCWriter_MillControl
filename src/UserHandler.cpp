@@ -335,7 +335,7 @@ void UserHandler::newRead()
 bool UserHandler::saveConfiguration(int tiSingle, int tiDobule)
 {
 
-        if (tiSingle < TiSingleMin || tiSingle > TiSingleMax || tiSingle >= tiDobule || tiDobule < TiDoubleMin || tiDobule > TiDoubleMax)
+        if (tiSingle < TI_SINGLE_MIN || tiSingle > TI_SINGLE_MAX || tiSingle >= tiDobule || tiDobule < TI_DOUBLE_MIN || tiDobule > TI_DOUBLE_MAX)
         {
                 return false;
         }

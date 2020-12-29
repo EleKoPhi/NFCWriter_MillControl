@@ -158,52 +158,53 @@ public:
     void SetProgress(int prog);
 
 private:
-    Drawer MillDrawer;
-    UserHandler MillUserHandler;
-    WDTZero MillWatchDog;
-    WebHandler MillWebHandler;
 
-    String _currentUser;
+    Drawer                          MillDrawer;
+    UserHandler                     MillUserHandler;
+    WDTZero                         MillWatchDog;
+    WebHandler                      MillWebHandler;
 
-    bool updateDisplay = true;
-    bool webHandlerActive = false;
+    String                          currentUser;
 
-    char currentStatus;
-    char key;
-    char oldKey;
-    char tempOldKey;
+    char                            key;
+    char                            oldKey;
+    char                            tempOldKey;
+    char                            currentStatus;
 
-    int localKey = 0;
-    int localKeyDisplayed = 0;
-    int activeKeyElement = 0;
-    int activeKeyElementDisplayed = 0;
+    bool updateDisplay              = true;
+    bool webHandlerActive           = false;
 
-    int activeProgress = 0;
-    int tempProgress = 0;
+    int localKey                    = 0;
+    int localKeyDisplayed           = 0;
+    int activeKeyElement            = 0;
+    int activeKeyElementDisplayed   = 0;
 
-    int activeUser = 0;
-    int activeCredit = 0;
+    int activeProgress              = 0;
+    int tempProgress                = 0;
 
-    unsigned long tiSingle = 0;
-    unsigned long tiDouble = 0;
-    unsigned long tiRemaining = 0;
+    int activeUser                  = 0;
+    int activeCredit                = 0;
 
-    unsigned long tiStart = 0;
-    unsigned long tiCurrentTime = 0;
-    unsigned long tiDelat = 0;
-    unsigned long tiInStopState = 0;
-    unsigned long tiStopBegin = 0;
-    unsigned long tiPassed = 0;
+    unsigned long tiSingle          = 0;
+    unsigned long tiDouble          = 0;
+    unsigned long tiRemaining       = 0;
 
-    unsigned long tiLeftDown = 0;
-    unsigned long tiDeltaLeftDown = 0;
-    unsigned long tiRightDown = 0;
-    unsigned long tiDeltaRightDown = 0;
-    unsigned long tiBothDown = 0;
-    unsigned long tiDeltaBothDown = 0;
+    unsigned long tiStart           = 0;
+    unsigned long tiCurrentTime     = 0;
+    unsigned long tiDelat           = 0;
+    unsigned long tiInStopState     = 0;
+    unsigned long tiStopBegin       = 0;
+    unsigned long tiPassed          = 0;
 
-    unsigned long tiTimer100ms = 0;
-    unsigned long tiTimer50ms = 0;
+    unsigned long tiLeftDown        = 0;
+    unsigned long tiDeltaLeftDown   = 0;
+    unsigned long tiRightDown       = 0;
+    unsigned long tiDeltaRightDown  = 0;
+    unsigned long tiBothDown        = 0;
+    unsigned long tiDeltaBothDown   = 0;
+
+    unsigned long tiTimer100ms      = 0;
+    unsigned long tiTimer50ms       = 0;
 };
 
 #endif

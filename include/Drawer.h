@@ -9,32 +9,31 @@
 class Drawer
 {
 public:
+
 Drawer(int clk, int data);
-void DrawMain();
-void DrawErr(bool sdStatus, bool nfcStatus, bool rtcStatus);
-void DrawDes(String user);
-void DrawSplitQ();
-void DrawUnknown();
-void DisplayProgress(int progress);
-void Clear();
-void DrawCenter(String txt, int y);
+
+void DrawClearDisplay();
+void DrawCenteredText(String txt, int y);
+
+void DrawStartUpAnimation();
+void DrawSystemStatus(bool sdStatus, bool nfcStatus, bool rtcStatus);
+void DrawProgress(int progress);
 void DrawReplay(int progress);
 void DrawDoneState();
 void DrawScreenSafer(int time);
 void DrawLastUser(String lastUser);
-void DrawKaffeeKing(String King);
-void DrawCurrentAmount(int amount);
 void DrawWaitForUser();
+void DrawSplitQuestion();
+void DrawSelectTime();
 void DrawPayOne();
-void DrawSplitQ2();
-void DrawTimeSelect();
-void DrawPay2 ();
+void DrawPayTwo ();
+void DrawPayTwo_First();
+void DrawPayTwo_Second();
+void DrawUnknown();
 void DrawTime (int Time, bool type);
-void DrawPay2_1();
-void DrawPay2_2();
 void DrawLowCredit();
 void DrawCredit(int ID, int Credit);
-void Err();
+void DrawSystemError();
 void DrawFreeState();
 void DrawStopState();
 void DrawKeyInput(int actualKey, int activeKeyElement);
@@ -58,15 +57,15 @@ void SetOldTime(int time);
 private:
 
 #ifdef SIXTYFOUR
-    U8G2_SSD1306_128X64_NONAME_F_SW_I2C _display;
+    U8G2_SSD1306_128X64_NONAME_F_SW_I2C Screen;
 #else
-    U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C _display;
+    U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C Screen;
 #endif
 
-int _oldTime;
+int size;
+int oldTime;
 int screensafer_x;
 int screensafer_y;
-int size;
 
 };
 

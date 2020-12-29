@@ -9,20 +9,23 @@ class WebHandler
 {
 public:
     WebHandler(int sdPin);
+
     bool Begin(String pw, String ssid);
     void Run();
-    void SetInputBuffer(String str);
-    String GetInputBuffer();
-    void SetInput(char c);
-    char GetInput();
+
     void ClearInputBuffer();
     char ProcressInput();
     void ProcessOutput();
     void UpdateOutput();
 
-    unsigned long GetServerWatchDogTimer();
-    void StartServerWatchDog();
-    bool IsTimeOut(unsigned long time);
+    String FormatMain(bool Single, bool Double, bool FreePull, bool RetrunKey);
+
+    void SetInputBuffer(String str);
+    String GetInputBuffer();
+
+    void SetInput(char c);
+    char GetInput();
+
     bool GetWasTimeOut();
     void SetWasTimeOut(bool st);
 
@@ -35,20 +38,28 @@ public:
     void SetWebHandlerActive(bool st);
     bool GetWebHandlerActive();
 
-    String FormatMain(bool Single, bool Double, bool FreePull, bool RetrunKey);
+    unsigned long GetServerWatchDogTimer();
+    void StartServerWatchDog();
+    bool IsTimeOut(unsigned long time);
 
 private:
     WiFiServer millserver;
     WiFiClient millClient;
+
     String InputBuffer;
-    char input;
-    bool wasTimeOut = false;
-    unsigned long serverWatchDogTimer = 0;
-    int chipSelectSd = 0;
     String ProgressPage = "";
-    char currentStatus = WaitForUser;
-    int progress = 0;
+
+    bool wasTimeOut = false;
     bool webHandlerActive = false;
+
+    char input;
+    char currentStatus = WaitForUser;
+
+    int chipSelectSd = 0;
+    int progress = 0;
+
+    unsigned long serverWatchDogTimer = 0;
+
 };
 
 #endif

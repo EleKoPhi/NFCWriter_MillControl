@@ -15,11 +15,11 @@ public:
 
         struct Config
         {
+                String SSID;
+                String PW;
                 int single_time;
                 int double_time;
                 int ServerOn;
-                String SSID;
-                String PW;
                 int chipPage;
                 int key;
         };
@@ -58,7 +58,6 @@ public:
 
         void SetChipSelectSD(int PIN);
         int &GetChipSelectSD();
-        ;
 
         MFRC522 &GetNFCReader();
         RTC_DS3231 &GetRTC();

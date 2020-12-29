@@ -66,8 +66,8 @@ unsigned long &Controller::GetTimeStopBegin() { return this->tiStopBegin; }
 void Controller::SetTimeInStop(unsigned long time) { this->tiInStopState = time; }
 unsigned long &Controller::GetTimeInStop() { return this->tiInStopState; }
 
-void Controller::SetCurrentUser(String userID) { this->_currentUser = userID; }
-String &Controller::GetCurrentUser() { return this->_currentUser; }
+void Controller::SetCurrentUser(String userID) { this->currentUser = userID; }
+String &Controller::GetCurrentUser() { return this->currentUser; }
 
 UserHandler &Controller::GetUserHandler() { return this->MillUserHandler; }
 Drawer &Controller::GetDrawer() { return this->MillDrawer; }
@@ -486,7 +486,7 @@ char Controller::tr_PayOne()
 
                                 if (_counter >= ERROR_RETRY_WRITING)
                                 {
-                                        GetDrawer().Err();
+                                        GetDrawer().DrawSystemError();
                                         delay(DELAY_AFTER_ERROR);
                                         return StateBegin(WaitForUser);
                                 }
@@ -547,7 +547,7 @@ char Controller::tr_PayTwo()
 
                                 if (_counter >= ERROR_RETRY_WRITING)
                                 {
-                                        GetDrawer().Err();
+                                        GetDrawer().DrawSystemError();
                                         delay(DELAY_AFTER_ERROR);
                                         return StateBegin(WaitForUser);
                                 }
@@ -697,10 +697,10 @@ void Controller::Begin()
         SetTimeDouble(GetUserHandler().config.double_time);
 
         // If there is a problem with NFC, SD or RTC, display the error states
-        GetDrawer().DrawErr(GetUserHandler().GetSDStatus(), GetUserHandler().GetNFCStatus(), GetUserHandler().GetRTCStatus());
+        GetDrawer().DrawSystemStatus(GetUserHandler().GetSDStatus(), GetUserHandler().GetNFCStatus(), GetUserHandler().GetRTCStatus());
 
         // Draw the startup animation
-        GetDrawer().DrawMain();
+        GetDrawer().DrawStartUpAnimation();
 
         // Setup watchdog time to 2s. One cycle is around 30ms
         GetWatchDog().setup(WDT_HARDCYCLE2S);
@@ -900,12 +900,12 @@ void Controller::States(char state)
                         if (GetUpdateDisplay())
                         {
                                 GetWebHandler().SetCurrentStatus(Single);
-                                GetDrawer().DisplayProgress(GetProgress());
+                                GetDrawer().DrawProgress(GetProgress());
                                 SetUpdateDisplay(false);
                         }
                         else if (GetProgress() >= GetDisplayedProgress() + PROGRESS_RESOLUTION)
                         {
-                                GetDrawer().DisplayProgress(GetDisplayedProgress());
+                                GetDrawer().DrawProgress(GetDisplayedProgress());
                                 SetDisplayedProgress(GetProgress());
                         }
                         else
@@ -922,12 +922,12 @@ void Controller::States(char state)
                         if (GetUpdateDisplay())
                         {
                                 GetWebHandler().SetCurrentStatus(Double);
-                                GetDrawer().DisplayProgress(GetProgress());
+                                GetDrawer().DrawProgress(GetProgress());
                                 SetUpdateDisplay(false);
                         }
                         else if (GetProgress() >= GetDisplayedProgress() + PROGRESS_RESOLUTION)
                         {
-                                GetDrawer().DisplayProgress(GetDisplayedProgress());
+                                GetDrawer().DrawProgress(GetDisplayedProgress());
                                 SetDisplayedProgress(GetProgress());
                         }
                         else
@@ -945,12 +945,12 @@ void Controller::States(char state)
                         {
                                 SetProgress((GetTimePassed() + GetTimeDelta()) / (GetTimeRemaning() / HUNDRED_PERCENT));
                                 SetDisplayedProgress(GetProgress());
-                                GetDrawer().DisplayProgress(GetProgress());
+                                GetDrawer().DrawProgress(GetProgress());
                                 SetUpdateDisplay(false);
                         }
                         else if (GetProgress() >= GetDisplayedProgress() + PROGRESS_RESOLUTION)
                         {
-                                GetDrawer().DisplayProgress(GetDisplayedProgress());
+                                GetDrawer().DrawProgress(GetDisplayedProgress());
                                 SetDisplayedProgress(GetProgress());
                         }
                         else
@@ -1028,7 +1028,7 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
-                                GetDrawer().DrawSplitQ2();
+                                GetDrawer().DrawSplitQuestion();
                                 SetUpdateDisplay(false);
                         }
                         TimeOut(TIMEOUT_DEFAULT);
@@ -1038,7 +1038,7 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
-                                GetDrawer().DrawTimeSelect();
+                                GetDrawer().DrawSelectTime();
                                 SetUpdateDisplay(false);
                         }
                         TimeOut(TIMEOUT_LONG);
@@ -1048,7 +1048,7 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
-                                GetDrawer().DrawPay2();
+                                GetDrawer().DrawPayTwo();
                                 SetUpdateDisplay(false);
                         }
                         TimeOut(TIMEOUT_DEFAULT);
@@ -1058,7 +1058,7 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
-                                GetDrawer().DrawPay2_1();
+                                GetDrawer().DrawPayTwo_First();
                                 SetUpdateDisplay(false);
                         }
                         TimeOut(TIMEOUT_DEFAULT);
@@ -1068,7 +1068,7 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
-                                GetDrawer().DrawPay2_2();
+                                GetDrawer().DrawPayTwo_Second();
                                 SetUpdateDisplay(false);
                         }
                         TimeOutWithBackPay(TIMEOUT_LONG);
@@ -1142,7 +1142,7 @@ void Controller::States(char state)
                         if (GetUpdateDisplay())
                         {
                                 Serial.println(int(GetCurrentStatus()));
-                                GetDrawer().Err();
+                                GetDrawer().DrawSystemError();
                                 SetUpdateDisplay(false);
                         }
                         TimeOut(TIMEOUT_SHORT);

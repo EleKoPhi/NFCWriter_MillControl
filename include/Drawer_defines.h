@@ -290,6 +290,12 @@
     #define DOPPELT_txt          "Double ->" 
     #define DOPPELT_y            52
     #define TIMESELECT_font      u8g2_font_logisoso16_tr
+
+    #define TIME_y               20
+    #define TIME_font            u8g2_font_logisoso16_tr
+    #define TIME_SINGLE_txt      "Zeit Einfach"
+    #define TIME_DOUBLE_txt      "Zeit Doppelt" 
+    #define TIME_VALUE_y         52
     /* TODO */
 
 #endif
