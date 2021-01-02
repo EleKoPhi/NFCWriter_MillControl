@@ -6,5 +6,4 @@ Nfc_MillControl_V2 is the updated version of the Nfc_MillControl_V1.
 
 The set target was and is to make an analog coffee grinder smart.
 
-## Contributing
-Pull requests are welcome.
+[Intro.pdf](https://github.com/EleKoPhi/Nfc_MillControl_V2/blob/master/PCB/Stromlaufplan.pdf)
