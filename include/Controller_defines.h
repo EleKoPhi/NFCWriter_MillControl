@@ -97,7 +97,8 @@ enum MillStates
 	WrongKey				= 	22,
 	AdaptTiSingle			= 	23,
 	AdaptTiDouble			=	24,
-	SelectTiToAdapt			= 	25
+	SelectTiToAdapt			= 	25,
+	WebHandlerStop			= 	26
 };
 
 #endif

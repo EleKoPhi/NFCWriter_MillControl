@@ -28,9 +28,9 @@
     #define RTCSTATE_y          50 
     #define SDERROR_txt         "SD  - ERR"
     #define SDOK_txt            "SD  - OK "
-    #define NFCERROR_txt        "NFC - Err"
+    #define NFCERROR_txt        "NFC - ERR"
     #define NFCOK_txt           "NFC - OK "
-    #define RTCERROR_txt        "RTC - Err"
+    #define RTCERROR_txt        "RTC - ERR"
     #define RTCOK_txt           "RTC - OK "
 
     #define LASTID_txt          "Letzte ID"
@@ -173,9 +173,9 @@
     #define RTCSTATE_y          30 
     #define SDERROR_txt         "SD  - ERR"
     #define SDOK_txt            "SD  - OK "
-    #define NFCERROR_txt        "NFC - Err"
+    #define NFCERROR_txt        "NFC - ERR"
     #define NFCOK_txt           "NFC - OK "
-    #define RTCERROR_txt        "RTC - Err"
+    #define RTCERROR_txt        "RTC - ERR"
     #define RTCOK_txt           "RTC - OK "
 
     #define LASTID_txt          "Letzte ID"
