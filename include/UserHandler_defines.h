@@ -49,7 +49,12 @@
 
 // Delayes
 
-#define DEBOUNCE_KEYS_MS            300
+#define DEBOUNCE_KEYS_MS_MAX        200
+#define DEBOUNCE_KEYS_MS_MIN        10
+
+#define RISING_EDGE_NOT_ALLOWED     0x1
+#define FALLING_EDGE_ALLOWED        0x2
+#define KEYS_BLOCKED                0x3
 
 
 #endif

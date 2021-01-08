@@ -239,6 +239,29 @@ char Controller::tr_ShowCredit()
                 return GetCurrentStatus();
         }
 }
+char Controller::tr_ShowLastUser()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                return StateBegin(PayOne);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                return StateBegin(AskForSplitPayment);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(WaitForUser);
+        }
+        else if (GetUserHandler().HasCardToRead())
+        {
+                return StateBegin(ReadCreditUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
 char Controller::tr_Screensafer()
 {
         SetStartTime(millis());
@@ -839,6 +862,8 @@ char Controller::StateTransitions()
                         return (tr_RepayState());
                 case DoneState:
                         return (tr_DoneState());
+                case ShowLastUser:
+                        return (tr_ShowLastUser());
                 default:
                         return (tr_WaitForUser());
                 };
@@ -1118,7 +1143,7 @@ void Controller::States(char state)
                         }
                         TimeOut(TIMEOUT_DEFAULT);
                 }
-                else if (state == LstUserState)
+                else if (state == ShowLastUser)
                 {
                         if (GetUpdateDisplay())
                         {

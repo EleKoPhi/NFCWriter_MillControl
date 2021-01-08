@@ -51,6 +51,7 @@ public:
     char tr_PayTwo_2();
     char tr_RepayState();
     char tr_DoneState();
+    char tr_ShowLastUser();
 
     // Activation of mill
 

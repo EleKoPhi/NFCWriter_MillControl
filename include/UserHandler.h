@@ -80,7 +80,7 @@ public:
         static void SetTimer(long ti);
 
         static void StartKeyDebounce();
-        static bool DebounceFinished(unsigned long time);
+        static byte DebounceFinished(unsigned long maxTime, unsigned long minTime);
 
         ////////////// GETTER AND SETTER END ///////////////////
 

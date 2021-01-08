@@ -1,19 +1,19 @@
 #ifndef UserHandler_defines
 #define UserHandler_defines
 
-#define SPACE                   " "
 #define UNDERSCORE              "_"
+#define UPDATETIME              1000
+#define STEPSIZE                4
+#define KEY_LENGTH			    5   
 
 #ifdef SIXTYFOUR
     #define TARGETFLIPMODE      1
 
     #define SAFTERINITIALSIZE   5
-    #define UPDATETIME          1000
-    #define STEPSIZE            4
 
     #define STARTANIMATION      0 
 
-    #define KEY_LENGTH			5   
+    #define SPACE               " "
 
     #define BITTEWAEHLEN_y      21
     #define BITTEWAEHLEN_txt    "Bitte waehlen"
@@ -160,6 +160,8 @@
 
     #define STARTANIMATION      0 
 
+    #define SPACE               "  "
+
     #define BITTEWAEHLEN_y      8
     #define BITTEWAEHLEN_txt    "Bitte waehlen"
     #define BITTEWAEHLEN_font   u8g2_font_ncenB08_tr
@@ -277,25 +279,24 @@
     #define KMNEXT_y            28
     #define KMNEXT_font         u8g2_font_ncenB14_tr
 
-    /* TODO */ 
     #define KEYINPUT_txt        "Enter Key"
-    #define KEYINPUT_y          21
-    #define KEYINPUT_font       u8g2_font_logisoso16_tr
-    #define KEY_SELECTOR_y      52
-    #define KEY_FONT            u8g2_font_logisoso24_tr
-    #define KEY_y               49
+    #define KEYINPUT_y          12
+    #define KEYINPUT_font       u8g2_font_ncenB12_tr
+    #define KEY_SELECTOR_y      28
+    #define KEY_FONT            u8g2_font_ncenB12_tr
+    #define KEY_y               26
 
-    #define EINFACH_txt          "<- Singe"
-    #define EINFACH_y            28
-    #define DOPPELT_txt          "Double ->" 
-    #define DOPPELT_y            52
-    #define TIMESELECT_font      u8g2_font_logisoso16_tr
+    #define EINFACH_txt          " "
+    #define EINFACH_y            0
+    #define DOPPELT_txt          "<- 1x  |  2x ->"
+    #define DOPPELT_y            22
+    #define TIMESELECT_font      u8g2_font_ncenB12_tr
 
-    #define TIME_y               20
-    #define TIME_font            u8g2_font_logisoso16_tr
+    #define TIME_y               12
+    #define TIME_font            u8g2_font_ncenB12_tr
     #define TIME_SINGLE_txt      "Zeit Einfach"
     #define TIME_DOUBLE_txt      "Zeit Doppelt" 
-    #define TIME_VALUE_y         52
+    #define TIME_VALUE_y         30
     /* TODO */
 
 #endif

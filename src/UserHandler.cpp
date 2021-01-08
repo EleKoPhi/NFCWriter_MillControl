@@ -35,9 +35,20 @@ bool &UserHandler::GetStBoth() { return KeyBoth; }
 void UserHandler::SetStBoth(bool st) { KeyBoth = st; }
 
 void UserHandler::StartKeyDebounce() { debounce = millis(); };
-bool UserHandler::DebounceFinished(unsigned long time)
+byte UserHandler::DebounceFinished(unsigned long max, unsigned long min)
 {
-        return (millis() - GetTimer()) > time;
+        if ((millis() - GetTimer()) > max)
+        {
+                return FALLING_EDGE_ALLOWED;
+        }
+        else if ((millis() - GetTimer()) < min)
+        {
+                return RISING_EDGE_NOT_ALLOWED;
+        }
+        else
+        {
+                return KEYS_BLOCKED;
+        }
 }
 unsigned long &UserHandler::GetTimer() { return debounce; };
 void UserHandler::SetTimer(long ti) { debounce = ti; }
@@ -91,6 +102,11 @@ void UserHandler::begin()
         GetNFCReader().PCD_Init();
 
         SetRTCStatus(GetRTC().begin());
+
+#ifdef SETRTC // Set RTC to compile TIME
+        GetRTC().adjust(DateTime(__DATE__, __TIME__));
+#endif
+
         _nfcReader.PCD_Init();
         SetSDStatus(SD.begin(GetChipSelectSD()));
         _nfcReader.PCD_Init();
@@ -98,9 +114,9 @@ void UserHandler::begin()
         _nfcReader.PCD_Init();
 
         pinMode(taster_LINKS_pin, INPUT);
-        attachInterrupt(digitalPinToInterrupt(taster_LINKS_pin), ISR_Left, FALLING);
+        attachInterrupt(digitalPinToInterrupt(taster_LINKS_pin), ISR_Left, CHANGE);
         pinMode(taster_RECHTS_pin, INPUT);
-        attachInterrupt(digitalPinToInterrupt(taster_RECHTS_pin), ISR_Right, FALLING);
+        attachInterrupt(digitalPinToInterrupt(taster_RECHTS_pin), ISR_Right, CHANGE);
 
         loadConfiguration();
 }
@@ -112,7 +128,11 @@ bool UserHandler::AuthenticateUser(int localKey)
 
 void UserHandler::ISR_Left()
 {
-        if (DebounceFinished(DEBOUNCE_KEYS_MS))
+        if (digitalRead(taster_LINKS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == RISING_EDGE_NOT_ALLOWED)
+        {
+                return;
+        }
+        else if (!digitalRead(taster_LINKS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == FALLING_EDGE_ALLOWED)
         {
                 if (digitalRead(taster_RECHTS_pin))
                 {
@@ -123,12 +143,21 @@ void UserHandler::ISR_Left()
                         SetStLeft(true);
                 }
                 StartKeyDebounce();
+                return;
+        }
+        else
+        {
+                return;
         }
 }
 
 void UserHandler::ISR_Right()
 {
-        if (DebounceFinished(DEBOUNCE_KEYS_MS))
+        if (digitalRead(taster_RECHTS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == RISING_EDGE_NOT_ALLOWED)
+        {
+                return;
+        }
+        else if (!digitalRead(taster_RECHTS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == FALLING_EDGE_ALLOWED)
         {
                 if (digitalRead(taster_LINKS_pin))
                 {
@@ -139,6 +168,11 @@ void UserHandler::ISR_Right()
                         SetStRight(true);
                 }
                 StartKeyDebounce();
+                return;
+        }
+        else
+        {
+                return;
         }
 }
 

@@ -6,7 +6,7 @@
 #ifdef SIXTYFOUR
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C &Drawer::GetDisplay() { return Screen; }
 #else
-U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C &Drawer::GetDisplay() { return _display; }
+U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C &Drawer::GetDisplay() { return Screen; }
 #endif
 
 Drawer::Drawer(int clk, int data) : Screen(U8G2_R0, clk, data, U8X8_PIN_NONE)

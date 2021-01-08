@@ -1,11 +1,6 @@
 #ifndef Controller_defines
 #define Controller_defines
 
-// COMPILER DEFINES 
-
-#define DEBUG
-
-
 // PIN DEFINES
 
 #define taster_LINKS_pin 		7
@@ -41,7 +36,7 @@
 #define TIMEOUT_LONG					60000
 #define TIMEOUT_SHORT					5000
 #define TIMEOUT_REPAY					30000
-#define TIME_FOR_PW_ACTIVATION			1000
+#define TIME_FOR_PW_ACTIVATION			3000
 
 
 // Status defines
