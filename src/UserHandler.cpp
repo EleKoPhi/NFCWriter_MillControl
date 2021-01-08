@@ -130,6 +130,7 @@ void UserHandler::ISR_Left()
 {
         if (digitalRead(taster_LINKS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == RISING_EDGE_NOT_ALLOWED)
         {
+                Serial.println("A");
                 return;
         }
         else if (!digitalRead(taster_LINKS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == FALLING_EDGE_ALLOWED)
@@ -155,6 +156,7 @@ void UserHandler::ISR_Right()
 {
         if (digitalRead(taster_RECHTS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == RISING_EDGE_NOT_ALLOWED)
         {
+                Serial.println("B");
                 return;
         }
         else if (!digitalRead(taster_RECHTS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == FALLING_EDGE_ALLOWED)

@@ -49,8 +49,8 @@
 
 // Delayes
 
-#define DEBOUNCE_KEYS_MS_MAX        200
-#define DEBOUNCE_KEYS_MS_MIN        10
+#define DEBOUNCE_KEYS_MS_MAX        300
+#define DEBOUNCE_KEYS_MS_MIN        30
 
 #define RISING_EDGE_NOT_ALLOWED     0x1
 #define FALLING_EDGE_ALLOWED        0x2
