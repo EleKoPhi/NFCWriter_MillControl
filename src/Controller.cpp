@@ -139,13 +139,20 @@ void Controller::SetWebHandlerActive(bool st) { this->webHandlerActive = st; }
 
 char Controller::tr_WaitForUser()
 {
-        if (GetCurrentKeyFlag() == LEFT_KEY)
+        if (GetCurrentKeyFlag() == LEFT_KEY && GetUserHandler().ReadUserInput() != LEFT_KEY)
         {
                 return StateBegin(PayOne);
         }
         else if (GetCurrentKeyFlag() == RIGHT_KEY)
         {
-                return StateBegin(AskForSplitPayment);
+                if (GetUserHandler().config.split == 1)
+                {
+                        return StateBegin(AskForSplitPayment);
+                }
+                else
+                {
+                        return StateBegin(PayTwo);
+                }
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
@@ -640,7 +647,7 @@ char Controller::tr_PayTwo_2()
                 String _currentUser = GetUserHandler().GetCardId();
                 int _credit = GetUserHandler().ReadCredit();
 
-                if (_credit >= PRICE_SINGE && GetCurrentUser() != _currentUser && _currentUser != ZERO_STRING)
+                if ((_credit >= PRICE_SINGE) && (GetCurrentUser() != _currentUser) && (_currentUser != ZERO_STRING))
                 {
                         GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
                         delay(DELAY_MILL_ON);
@@ -651,6 +658,10 @@ char Controller::tr_PayTwo_2()
                 {
                         return StateBegin(PayTwo_2);
                 }
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(RepayState);
         }
         else
         {
@@ -858,6 +869,8 @@ char Controller::StateTransitions()
                         return (tr_PayTwo());
                 case PayTwo_1:
                         return (tr_PayTwo_1());
+                case PayTwo_2:
+                        return (tr_PayTwo_2());
                 case RepayState:
                         return (tr_RepayState());
                 case DoneState:

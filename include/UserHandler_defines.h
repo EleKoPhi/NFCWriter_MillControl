@@ -15,6 +15,7 @@
 #define JSON_FLAG_CHIPPAGE          "ChipPage"
 #define JSON_FLAG_SSID              "SSID"
 #define JSON_FLAG_KEY               "KEY"
+#define JSON_FLAG_SPLIT             "Split"
 
 #define DEFAULT_SERVERSTATE         0
 #define DEFAULT_PASSWORD            "123456789"
@@ -23,6 +24,7 @@
 #define DEFAULT_TIMESINGLE          10000
 #define DEFAULT_CHIPPAGE            4
 #define DEFAULT_KEY                 10
+#define DEFAULT_Split               1
 
 
 // LOG DEFINES
@@ -50,7 +52,7 @@
 // Delayes
 
 #define DEBOUNCE_KEYS_MS_MAX        300
-#define DEBOUNCE_KEYS_MS_MIN        30
+#define DEBOUNCE_KEYS_MS_MIN        50
 
 #define RISING_EDGE_NOT_ALLOWED     0x1
 #define FALLING_EDGE_ALLOWED        0x2

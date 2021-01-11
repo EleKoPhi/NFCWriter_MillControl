@@ -85,6 +85,7 @@ void UserHandler::loadConfiguration()
         config.PW = doc[JSON_FLAG_PASSWORD] | DEFAULT_PASSWORD;
         config.chipPage = doc[JSON_FLAG_CHIPPAGE] | DEFAULT_CHIPPAGE;
         config.key = doc[JSON_FLAG_KEY] | DEFAULT_KEY;
+        config.split = doc[JSON_FLAG_SPLIT] | DEFAULT_Split;
 
         _file.close();
 }
@@ -394,6 +395,7 @@ bool UserHandler::saveConfiguration(int tiSingle, int tiDobule)
         doc[JSON_FLAG_SERVERSTATE] = config.ServerOn;
         doc[JSON_FLAG_CHIPPAGE] = config.chipPage;
         doc[JSON_FLAG_KEY] = config.key;
+        doc[JSON_FLAG_SPLIT] = config.split;
 
         if (serializeJson(doc, _file) == 0)
         {

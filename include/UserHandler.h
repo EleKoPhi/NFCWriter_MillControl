@@ -22,6 +22,7 @@ public:
                 int ServerOn;
                 int chipPage;
                 int key;
+                int split;
         };
         Config config;
 
