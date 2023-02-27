@@ -68,7 +68,7 @@ UserHandler::UserHandler(int chipSelect, int slaveSelect, int rstPin) : _nfcRead
         SetUser("");
 }
 
-void UserHandler::loadConfiguration()
+bool UserHandler::loadConfiguration()
 {
         SD.begin(GetChipSelectSD());
         File _file = SD.open(CONFIG_FILE, FILE_READ);
@@ -88,6 +88,14 @@ void UserHandler::loadConfiguration()
         config.split = doc[JSON_FLAG_SPLIT] | DEFAULT_Split;
 
         _file.close();
+
+        if(config.chipPage == DEFAULT_CHIPPAGE)
+        {
+                return false;
+        }
+        return true;
+
+        
 }
 
 void UserHandler::ResetInput()
@@ -119,7 +127,10 @@ void UserHandler::begin()
         pinMode(taster_RECHTS_pin, INPUT);
         attachInterrupt(digitalPinToInterrupt(taster_RECHTS_pin), ISR_Right, CHANGE);
 
-        loadConfiguration();
+        if(GetSDStatus() == true)
+        {
+                SetSDStatus(loadConfiguration());
+        }
 }
 
 bool UserHandler::AuthenticateUser(int localKey)

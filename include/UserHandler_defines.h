@@ -22,7 +22,7 @@
 #define DEFAULT_SSID                "TEST123TEST"
 #define DEFAULT_TIMEDOUBLE          20000
 #define DEFAULT_TIMESINGLE          10000
-#define DEFAULT_CHIPPAGE            4
+#define DEFAULT_CHIPPAGE            0 // Standard:4 // Werner:5 // Neu: 6 // Default: 0
 #define DEFAULT_KEY                 10
 #define DEFAULT_Split               1
 

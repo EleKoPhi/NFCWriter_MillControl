@@ -1059,7 +1059,7 @@ void Controller::States(char state)
 
                 else if (state == SceenSaferState)
                 {
-                        GetDrawer().DrawScreenSafer(GetTimeDelta());
+                        GetDrawer().DrawScreenSafer(millis());
                 }
 
                 else if (state == AskForSplitPayment)

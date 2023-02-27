@@ -38,7 +38,7 @@ public:
         String ID();
         void newRead();
 
-        void loadConfiguration();
+        bool loadConfiguration();
         bool saveConfiguration(int tiSingle, int tiDobule);
 
         bool AuthenticateUser(int localKey);
