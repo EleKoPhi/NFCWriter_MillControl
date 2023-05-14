@@ -3,7 +3,7 @@
 
 // FILE NAMES
 
-#define CONFIG_FILE                 "CONFIG.TXT"
+#define CONFIG_FILE                 "config.txt"
 #define LOG_FILE                    "UserLog.txt"
 
 
