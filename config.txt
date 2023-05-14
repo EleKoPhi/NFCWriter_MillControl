@@ -4,6 +4,7 @@
     "ServerOn": 0,
     "SSID": "KMSERVICE",
     "PW": "123456789",
-    "ChipPage": 5,
-    "KEY": 20
+    "ChipPage": 6,
+    "KEY": 20,
+    "Split": 1
   }

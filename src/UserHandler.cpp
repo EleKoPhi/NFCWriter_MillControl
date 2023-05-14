@@ -76,7 +76,10 @@ bool UserHandler::loadConfiguration()
         StaticJsonDocument<512> doc;
         DeserializationError error = deserializeJson(doc, _file);
         if (error)
+        {
+                return false;
                 Serial.println(F("Failed to read file, using default configuration"));
+        }
 
         config.single_time = doc[JSON_FLAG_TIMESINGLE] | DEFAULT_TIMESINGLE;
         config.double_time = doc[JSON_FLAG_TIMEDOUBLE] | DEFAULT_TIMEDOUBLE;
@@ -89,13 +92,11 @@ bool UserHandler::loadConfiguration()
 
         _file.close();
 
-        if(config.chipPage == DEFAULT_CHIPPAGE)
+        if (config.chipPage == DEFAULT_CHIPPAGE)
         {
                 return false;
         }
         return true;
-
-        
 }
 
 void UserHandler::ResetInput()
@@ -117,7 +118,7 @@ void UserHandler::begin()
 #endif
 
         _nfcReader.PCD_Init();
-        SetSDStatus(SD.begin(GetChipSelectSD()));
+        SetSDStatus(true /*SD.begin(GetChipSelectSD())*/);
         _nfcReader.PCD_Init();
         SetNFCStatus(GetNFCReader().PCD_PerformSelfTest());
         _nfcReader.PCD_Init();
@@ -127,7 +128,7 @@ void UserHandler::begin()
         pinMode(taster_RECHTS_pin, INPUT);
         attachInterrupt(digitalPinToInterrupt(taster_RECHTS_pin), ISR_Right, CHANGE);
 
-        if(GetSDStatus() == true)
+        if (GetSDStatus() == true)
         {
                 SetSDStatus(loadConfiguration());
         }
