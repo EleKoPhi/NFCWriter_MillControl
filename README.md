@@ -1,4 +1,4 @@
-# Nfc_MillControl_V2
+# NFCWriter_MillControl
 
 Nfc_MillControl_V2 is the updated version of the Nfc_MillControl_V1.
 
