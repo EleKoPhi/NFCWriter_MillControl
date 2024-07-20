@@ -2,28 +2,21 @@
 #include "UserHandler.h"
 #include "Controller_defines.h"
 #include <SPI.h>
-#include <SD.h>
 #include <MFRC522.h>
-#include <ArduinoJson.h>
 #include "UserHandler_defines.h"
+#include <EEPROM.h>
+#include <Preferences.h>
 
 byte PSWBuff[] = PW_BUFFER;
 byte pACK[] = ACK_BUFFER;
 
-int &UserHandler::GetChipSelectSD() { return ChipSelect_SD; }
-void UserHandler::SetChipSelectSD(int PIN) { ChipSelect_SD = PIN; }
-bool &UserHandler::GetSDStatus() { return SdStatus; }
-void UserHandler::SetSDStatus(bool Status) { SdStatus = Status; }
-bool &UserHandler::GetRTCStatus() { return RtcStatus; }
-void UserHandler::SetRTCStatus(bool Status) { RtcStatus = Status; }
+Preferences nvm_storage;
+
 bool &UserHandler::GetNFCStatus() { return NfcStatus; }
 void UserHandler::SetNFCStatus(bool Status) { NfcStatus = Status; }
 String &UserHandler::GetUser() { return User; }
 void UserHandler::SetUser(String user) { User = user; }
 MFRC522 &UserHandler::GetNFCReader() { return _nfcReader; }
-RTC_DS3231 &UserHandler::GetRTC() { return _rtc; }
-File &UserHandler::GetLogFile() { return _logFile; }
-void UserHandler::SetLogFile(File filename) { _logFile = filename; }
 void UserHandler::SetUserKey(int key) { UserKey = key; }
 int &UserHandler::GetUserKey() { return UserKey; }
 
@@ -61,39 +54,25 @@ unsigned long UserHandler::debounce = 0;
 
 UserHandler::UserHandler(int chipSelect, int slaveSelect, int rstPin) : _nfcReader(slaveSelect, rstPin)
 {
-        SetChipSelectSD(chipSelect);
-        SetSDStatus(false);
         SetNFCStatus(false);
-        SetRTCStatus(false);
         SetUser("");
 }
 
 bool UserHandler::loadConfiguration()
 {
-        SD.begin(GetChipSelectSD());
-        File _file = SD.open(CONFIG_FILE, FILE_READ);
 
-        StaticJsonDocument<512> doc;
-        DeserializationError error = deserializeJson(doc, _file);
-        if (error)
+        nvm_storage.begin("mill_times", false);
+
+        config.single_time = nvm_storage.getUInt("ti_single", DEFAULT_TIMESINGLE);
+        config.double_time = nvm_storage.getUInt("ti_double", DEFAULT_TIMEDOUBLE);
+
+        config.chipPage = DEFAULT_CHIPPAGE;
+        config.key = DEFAULT_KEY;
+        config.split = DEFAULT_Split;
+
+        if (config.single_time == 0 || config.single_time == 0)
         {
-                return false;
-                Serial.println(F("Failed to read file, using default configuration"));
-        }
-
-        config.single_time = doc[JSON_FLAG_TIMESINGLE] | DEFAULT_TIMESINGLE;
-        config.double_time = doc[JSON_FLAG_TIMEDOUBLE] | DEFAULT_TIMEDOUBLE;
-        config.ServerOn = doc[JSON_FLAG_SERVERSTATE] | DEFAULT_SERVERSTATE;
-        config.SSID = doc[JSON_FLAG_SSID] | DEFAULT_SSID;
-        config.PW = doc[JSON_FLAG_PASSWORD] | DEFAULT_PASSWORD;
-        config.chipPage = doc[JSON_FLAG_CHIPPAGE] | DEFAULT_CHIPPAGE;
-        config.key = doc[JSON_FLAG_KEY] | DEFAULT_KEY;
-        config.split = doc[JSON_FLAG_SPLIT] | DEFAULT_Split;
-
-        _file.close();
-
-        if (config.chipPage == DEFAULT_CHIPPAGE)
-        {
+                Serial.println("NVM Error");
                 return false;
         }
         return true;
@@ -109,18 +88,12 @@ void UserHandler::ResetInput()
 void UserHandler::begin()
 {
         SPI.begin();
+
         GetNFCReader().PCD_Init();
-
-        SetRTCStatus(GetRTC().begin());
-
-#ifdef SETRTC // Set RTC to compile TIME
-        GetRTC().adjust(DateTime(__DATE__, __TIME__));
-#endif
-
         _nfcReader.PCD_Init();
-        SetSDStatus(true /*SD.begin(GetChipSelectSD())*/);
         _nfcReader.PCD_Init();
-        SetNFCStatus(GetNFCReader().PCD_PerformSelfTest());
+        SetNFCStatus(_nfcReader.PCD_PerformSelfTest());
+        Serial.println(GetNFCStatus());
         _nfcReader.PCD_Init();
 
         pinMode(taster_LINKS_pin, INPUT);
@@ -128,10 +101,7 @@ void UserHandler::begin()
         pinMode(taster_RECHTS_pin, INPUT);
         attachInterrupt(digitalPinToInterrupt(taster_RECHTS_pin), ISR_Right, CHANGE);
 
-        if (GetSDStatus() == true)
-        {
-                SetSDStatus(loadConfiguration());
-        }
+        loadConfiguration();
 }
 
 bool UserHandler::AuthenticateUser(int localKey)
@@ -143,7 +113,6 @@ void UserHandler::ISR_Left()
 {
         if (digitalRead(taster_LINKS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == RISING_EDGE_NOT_ALLOWED)
         {
-                Serial.println("A");
                 return;
         }
         else if (!digitalRead(taster_LINKS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == FALLING_EDGE_ALLOWED)
@@ -169,7 +138,6 @@ void UserHandler::ISR_Right()
 {
         if (digitalRead(taster_RECHTS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == RISING_EDGE_NOT_ALLOWED)
         {
-                Serial.println("B");
                 return;
         }
         else if (!digitalRead(taster_RECHTS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == FALLING_EDGE_ALLOWED)
@@ -252,46 +220,12 @@ String UserHandler::GetCardId()
 String UserHandler::GetTimeStamp()
 {
         String _moment = "";
-        GetRTC().begin();
-        DateTime _timeStamp = GetRTC().now();
-        GetNFCReader().PCD_Init(); // Shit :O
-
-        _moment = String(_timeStamp.year(), DEC) + "-";
-        if (_timeStamp.month() < 10)
-                _moment += "0";
-        _moment += String(_timeStamp.month(), DEC) + "-";
-        if (_timeStamp.day() < 10)
-                _moment += "0";
-        _moment += String(_timeStamp.day(), DEC) + LOG_SERPERATOR;
-        if (_timeStamp.hour() < 10)
-                _moment += "0";
-        _moment += String(_timeStamp.hour(), DEC) + ":";
-        if (_timeStamp.minute() < 10)
-                _moment += "0";
-        _moment += String(_timeStamp.minute(), DEC) + "";
 
         return _moment;
 }
 
 void UserHandler::WriteToLog(String userID, String credit, bool isDouble)
 {
-        SD.begin(GetChipSelectSD());
-        SetLogFile(SD.open(LOG_FILE, FILE_WRITE));
-        if (GetLogFile())
-        {
-                String _logLine = "";
-                if (isDouble)
-                {
-                        _logLine = GetTimeStamp() + LOG_SERPERATOR + userID + LOG_SERPERATOR + credit + LOG_SERPERATOR + DOUBLE;
-                }
-                else
-                {
-                        _logLine = GetTimeStamp() + LOG_SERPERATOR + userID + LOG_SERPERATOR + credit + LOG_SERPERATOR + SINGLE;
-                }
-                GetLogFile().println(_logLine);
-        }
-
-        GetLogFile().close();
 }
 
 int UserHandler::ReadCredit()
@@ -302,7 +236,12 @@ int UserHandler::ReadCredit()
 
         _byteCount = sizeof(_buffer);
 
-        _status = GetNFCReader().MIFARE_Read(config.chipPage, _buffer, &_byteCount);
+        _status = GetNFCReader().MIFARE_Read(0x06, _buffer, &_byteCount);
+
+        Serial.println(_buffer[0]);
+        Serial.println(_buffer[1]);
+        Serial.println(_buffer[2]);
+        Serial.println(_buffer[3]);
 
         int _key_AND = (_buffer[0] & _buffer[1] & _buffer[2] & _buffer[3]);
         int _key_SUM = ((_buffer[0] + _buffer[1] + _buffer[2] + _buffer[3]) / 4);
@@ -327,7 +266,7 @@ int UserHandler::WriteCredit(int newCredit, bool paymentType)
 
         ReadCredit();
         GetNFCReader().PCD_NTAG216_AUTH(&_pwBufer[0], _pACK);
-        _stat = GetNFCReader().MIFARE_Ultralight_Write(config.chipPage, _writeBuffer, 4); // EE-5 KM CP = 0x04
+        _stat = GetNFCReader().MIFARE_Ultralight_Write(0x06, _writeBuffer, 4); // EE-5 KM CP = 0x04
 
         if (_stat != 0)
         {
@@ -346,7 +285,6 @@ int UserHandler::WriteCredit(int newCredit, bool paymentType)
         }
 
         SetUser(String(GetCardId().toInt()));
-        WriteToLog(GetUser().c_str(), String(newCredit, DEC).c_str(), paymentType);
         return 0;
 }
 
@@ -386,34 +324,13 @@ bool UserHandler::saveConfiguration(int tiSingle, int tiDobule)
 
         if (tiSingle < TI_SINGLE_MIN || tiSingle > TI_SINGLE_MAX || tiSingle >= tiDobule || tiDobule < TI_DOUBLE_MIN || tiDobule > TI_DOUBLE_MAX)
         {
+                Serial.println("Invalid time setting!");
                 return false;
         }
 
-        SD.remove(CONFIG_FILE);
-
-        File _file = SD.open(CONFIG_FILE, FILE_WRITE);
-        if (!_file)
-        {
-                return false;
-        }
-
-        StaticJsonDocument<512> doc;
-
-        doc[JSON_FLAG_SSID] = config.SSID;
-        doc[JSON_FLAG_PASSWORD] = config.PW;
-        doc[JSON_FLAG_CHIPPAGE] = config.chipPage;
-        doc[JSON_FLAG_TIMESINGLE] = tiSingle;
-        doc[JSON_FLAG_TIMEDOUBLE] = tiDobule;
-        doc[JSON_FLAG_SERVERSTATE] = config.ServerOn;
-        doc[JSON_FLAG_CHIPPAGE] = config.chipPage;
-        doc[JSON_FLAG_KEY] = config.key;
-        doc[JSON_FLAG_SPLIT] = config.split;
-
-        if (serializeJson(doc, _file) == 0)
-        {
-                Serial.println(F("Failed to write to file"));
-        }
-
-        _file.close();
+        nvm_storage.putUInt("ti_single", uint32_t(tiSingle));
+        nvm_storage.putUInt("ti_double", uint32_t(tiDobule));
+        nvm_storage.end();
+        Serial.println("Saved mill time to NVM!");
         return true;
 }

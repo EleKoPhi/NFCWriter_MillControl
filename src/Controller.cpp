@@ -3,12 +3,9 @@
 #include "Drawer.h"
 #include "Controller.h"
 #include "Controller_defines.h"
-#include <ArduinoJson.h>
-#include <WiFi101.h>
 #include <SPI.h>
-#include <WDTZero.h>
 
-Controller::Controller(int chipSelect, int slaveSelect, int rstPin, int clk, int data) : MillDrawer(clk, data), MillUserHandler(chipSelect, slaveSelect, rstPin), MillWatchDog(), MillWebHandler(chipSelect) {}
+Controller::Controller(int chipSelect, int slaveSelect, int rstPin, int clk, int data) : MillDrawer(clk, data), MillUserHandler(chipSelect, slaveSelect, rstPin) {}
 
 //////////////////  Getter and Setter for all variables  ////////////////////////////
 
@@ -71,8 +68,6 @@ String &Controller::GetCurrentUser() { return this->currentUser; }
 
 UserHandler &Controller::GetUserHandler() { return this->MillUserHandler; }
 Drawer &Controller::GetDrawer() { return this->MillDrawer; }
-WDTZero &Controller::GetWatchDog() { return this->MillWatchDog; }
-WebHandler &Controller::GetWebHandler() { return this->MillWebHandler; }
 
 int &Controller::GetUserAsInt() { return this->activeCredit; }
 void Controller::SetUserAsInt(int credit) { this->activeCredit = credit; }
@@ -131,9 +126,6 @@ void Controller::SetDisplayedProgress(int prog) { this->activeProgress = prog; }
 
 int &Controller::GetProgress() { return this->tempProgress; }
 void Controller::SetProgress(int prog) { this->tempProgress = prog; }
-
-bool &Controller::GetWebHandlerActive() { return this->webHandlerActive; }
-void Controller::SetWebHandlerActive(bool st) { this->webHandlerActive = st; }
 
 /////////////////////////////////////////////////////////////////////////////////
 
@@ -498,7 +490,7 @@ char Controller::tr_PayOne()
                 {
                         _status = GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
 
-                        if (_status == OK)
+                        if (_status == _Ok)
                         {
                                 delay(DELAY_MILL_ON);
                                 MillOn();
@@ -506,10 +498,10 @@ char Controller::tr_PayOne()
                         }
                         else
                         {
-                                while ((_status != OK) && (_counter <= ERROR_RETRY_WRITING))
+                                while ((_status != _Ok) && (_counter <= ERROR_RETRY_WRITING))
                                 {
                                         _status = GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
-                                        if (_status == OK)
+                                        if (_status == _Ok)
                                                 break;
                                         _counter++;
                                 }
@@ -559,7 +551,7 @@ char Controller::tr_PayTwo()
                 {
                         _status = GetUserHandler().WriteCredit(_credit - PRICE_DOUBLE, true);
 
-                        if (_status == OK)
+                        if (_status == _Ok)
                         {
                                 delay(DELAY_MILL_ON);
                                 MillOn();
@@ -567,10 +559,10 @@ char Controller::tr_PayTwo()
                         }
                         else
                         {
-                                while ((_status != OK) && (_counter <= ERROR_RETRY_WRITING))
+                                while ((_status != _Ok) && (_counter <= ERROR_RETRY_WRITING))
                                 {
                                         _status = GetUserHandler().WriteCredit(_credit - PRICE_DOUBLE, true);
-                                        if (_status == OK)
+                                        if (_status == _Ok)
                                                 break;
                                         _counter++;
                                 }
@@ -723,30 +715,24 @@ void Controller::Begin()
         // Make sure the mill if off
         MillOff();
 
-        // Initialize the user handler for for NFC, SD and RTC functionallity
+        // Initialize the user handler for for NFC functionallity
         GetUserHandler().begin();
 
-        //Read time for singe and double from config file
+        // Read time for singe and double from config file
         SetTimeSingle(GetUserHandler().config.single_time);
         SetTimeDouble(GetUserHandler().config.double_time);
-
-        // If there is a problem with NFC, SD or RTC, display the error states
-        GetDrawer().DrawSystemStatus(GetUserHandler().GetSDStatus(), GetUserHandler().GetNFCStatus(), GetUserHandler().GetRTCStatus());
+        
+        // If there is a problem with NFC, display the error states
+        GetDrawer().DrawSystemStatus(GetUserHandler().GetNFCStatus());
 
         // Draw the startup animation
         GetDrawer().DrawStartUpAnimation();
 
         // Setup watchdog time to 2s. One cycle is around 30ms
-        GetWatchDog().setup(WDT_HARDCYCLE2S);
+        // GetWatchDog().setup(WDT_HARDCYCLE2S);
 
         // Draw initial screen
         SetUpdateDisplay(true);
-
-        // If ServerOn is 1 - Start the webserver for adational functionality
-        if (byte(GetUserHandler().config.ServerOn))
-        {
-                GetWebHandler().Begin(GetUserHandler().config.PW, GetUserHandler().config.SSID);
-        }
 }
 
 void Controller::ProcessInput()
@@ -814,24 +800,6 @@ char Controller::StateTransitions()
         if ((millis() - GetTimer50ms()) > TASK_50MS)
         {
                 SetTimer50ms(millis());
-
-                if (!GetWebHandler().GetWebHandlerActive())
-                {
-                        switch (GetWebHandler().GetCurrentStatus())
-                        {
-                        case Single:
-                                GetWebHandler().SetWebHandlerActive(true);
-                                return StateBegin(Single);
-                        case Double:
-                                GetWebHandler().SetWebHandlerActive(true);
-                                return StateBegin(Double);
-                        case FreePullState:
-                                GetWebHandler().SetWebHandlerActive(true);
-                                return StateBegin(FreePullState);
-                        default:
-                                GetWebHandler().SetWebHandlerActive(false);
-                        }
-                }
 
                 switch (GetCurrentStatus())
                 {
@@ -909,13 +877,11 @@ bool Controller::TimeOutWithBackPay(unsigned long time)
 
 void Controller::UpDateTime()
 {
-        GetWatchDog().clear();
         SetTimeDelta(millis() - GetStartTime());
 }
 
 void Controller::States(char state)
 {
-        GetWebHandler().Run();
 
         if ((millis() - GetTimer100ms()) > TASK_100MS)
         {
@@ -929,7 +895,6 @@ void Controller::States(char state)
                         {
                                 GetDrawer().DrawWaitForUser();
                                 SetUpdateDisplay(false);
-                                GetWebHandler().SetCurrentStatus(WaitForUser);
                         }
                 }
 
@@ -937,7 +902,6 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
-                                GetWebHandler().SetCurrentStatus(Single);
                                 GetDrawer().DrawProgress(GetProgress());
                                 SetUpdateDisplay(false);
                         }
@@ -949,7 +913,6 @@ void Controller::States(char state)
                         else
                         {
                                 SetProgress((GetTimeDelta()) / (GetTimeSingle() / HUNDRED_PERCENT));
-                                GetWebHandler().SetProgressForHttps(GetProgress());
                         }
 
                         TimeOut(GetTimeSingle());
@@ -959,7 +922,6 @@ void Controller::States(char state)
                 {
                         if (GetUpdateDisplay())
                         {
-                                GetWebHandler().SetCurrentStatus(Double);
                                 GetDrawer().DrawProgress(GetProgress());
                                 SetUpdateDisplay(false);
                         }
@@ -971,7 +933,6 @@ void Controller::States(char state)
                         else
                         {
                                 SetProgress((GetTimeDelta()) / (GetTimeDouble() / HUNDRED_PERCENT));
-                                GetWebHandler().SetProgressForHttps(GetProgress());
                         }
 
                         TimeOut(GetTimeDouble());
@@ -994,7 +955,6 @@ void Controller::States(char state)
                         else
                         {
                                 SetProgress((GetTimePassed() + GetTimeDelta()) / (GetTimeRemaning() / HUNDRED_PERCENT));
-                                GetWebHandler().SetProgressForHttps(GetProgress());
                         }
 
                         TimeOut(GetTimeRemaning() - GetTimePassed());

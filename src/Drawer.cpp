@@ -77,19 +77,10 @@ void Drawer::DrawStartUpAnimation()
         }
 }
 
-void Drawer::DrawSystemStatus(bool sdStatus, bool nfcStatus, bool rtcStatus)
+void Drawer::DrawSystemStatus(bool nfcStatus)
 {
         GetDisplay().clearBuffer();
         GetDisplay().setFont(STATE_font);
-
-        if (!sdStatus)
-        {
-                DrawCenteredText(SDERROR_txt, SDSTATE_y);
-        }
-        else
-        {
-                DrawCenteredText(SDOK_txt, SDSTATE_y);
-        }
 
         if (!nfcStatus)
         {
@@ -97,22 +88,7 @@ void Drawer::DrawSystemStatus(bool sdStatus, bool nfcStatus, bool rtcStatus)
         }
         else
         {
-                DrawCenteredText(NFCOK_txt, NFCSTATE_y);
-        }
-        if (!rtcStatus)
-        {
-                DrawCenteredText(RTCERROR_txt, RTCSTATE_y);
-        }
-        else
-        {
-                DrawCenteredText(RTCOK_txt, RTCSTATE_y);
-        }
-
-        if (!sdStatus | !nfcStatus | !rtcStatus)
-        {
-                GetDisplay().sendBuffer();
-                while (true)
-                        ;
+                DrawCenteredText(NFC_Ok_txt, NFCSTATE_y);
         }
 }
 
@@ -227,8 +203,8 @@ void Drawer::DrawReplay(int progress)
         DrawCenteredText(REPAY1_txt, REPAY1_y);
         GetDisplay().setFont(REPAY2_font);
         DrawCenteredText(REPAY2_txt, REPAY2_y);
-        GetDisplay().drawLine(0, GetDisplay().getHeight() / 2 + 1, GetDisplay().getWidth() * ((progress)*0.01), GetDisplay().getHeight() / 2 + 1);
-        GetDisplay().drawLine(GetDisplay().getWidth(), GetDisplay().getHeight() / 2 - 1, (GetDisplay().getWidth() - GetDisplay().getWidth() * ((progress)*0.01)), GetDisplay().getHeight() / 2 - 1);
+        GetDisplay().drawLine(0, GetDisplay().getHeight() / 2 + 1, GetDisplay().getWidth() * ((progress) * 0.01), GetDisplay().getHeight() / 2 + 1);
+        GetDisplay().drawLine(GetDisplay().getWidth(), GetDisplay().getHeight() / 2 - 1, (GetDisplay().getWidth() - GetDisplay().getWidth() * ((progress) * 0.01)), GetDisplay().getHeight() / 2 - 1);
         GetDisplay().sendBuffer();
 }
 

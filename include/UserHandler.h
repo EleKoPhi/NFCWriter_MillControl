@@ -2,11 +2,10 @@
 #define UserHandler_h
 
 #include "Arduino.h"
-#include <SD.h>
+
 #include <SPI.h>
 #include <MFRC522.h>
 #include <Wire.h>
-#include "RTClib.h"
 
 class UserHandler
 {
@@ -17,8 +16,8 @@ public:
         {
                 String SSID;
                 String PW;
-                int single_time;
-                int double_time;
+                uint32_t single_time;
+                uint32_t double_time;
                 int ServerOn;
                 int chipPage;
                 int key;
@@ -45,10 +44,6 @@ public:
 
         ////////////// GETTER AND SETTER BEGIN /////////////////
 
-        bool &GetSDStatus();
-        void SetSDStatus(bool Status);
-        bool &GetRTCStatus();
-        void SetRTCStatus(bool Status);
         bool &GetNFCStatus();
         void SetNFCStatus(bool Status);
 
@@ -57,14 +52,7 @@ public:
         String &GetUser();
         void SetUser(String user);
 
-        void SetChipSelectSD(int PIN);
-        int &GetChipSelectSD();
-
         MFRC522 &GetNFCReader();
-        RTC_DS3231 &GetRTC();
-
-        File &GetLogFile();
-        void SetLogFile(File filename);
 
         int &GetUserKey();
         void SetUserKey(int key);
@@ -89,18 +77,12 @@ private:
         static void ISR_Left(void);
         static void ISR_Right(void);
 
-        File _userData;
-        File _logFile;
-        RTC_DS3231 _rtc;
         MFRC522 _nfcReader;
         String User;
 
-        int ChipSelect_SD;
         int UserKey;
 
-        bool SdStatus;
         bool NfcStatus;
-        bool RtcStatus;
 
         static bool KeyLeft;
         static bool KeyRight;

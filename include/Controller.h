@@ -4,10 +4,7 @@
 #include "Arduino.h"
 #include "UserHandler.h"
 #include "Drawer.h"
-#include "WebHandler.h"
-#include <WiFi101.h>
 #include <SPI.h>
-#include <WDTZero.h>
 
 class Controller
 {
@@ -62,8 +59,6 @@ public:
 
     UserHandler &GetUserHandler();
     Drawer &GetDrawer();
-    WDTZero &GetWatchDog();
-    WebHandler &GetWebHandler();
 
     char &GetCurrentStatus();
     void SetCurrentStatus(char stat);
@@ -149,9 +144,6 @@ public:
     bool &GetUpdateDisplay();
     void SetUpdateDisplay(bool st);
 
-    bool &GetWebHandlerActive();
-    void SetWebHandlerActive(bool st);
-
     int &GetDisplayedProgress();
     void SetDisplayedProgress(int progress);
 
@@ -159,53 +151,49 @@ public:
     void SetProgress(int prog);
 
 private:
+    Drawer MillDrawer;
+    UserHandler MillUserHandler;
 
-    Drawer                          MillDrawer;
-    UserHandler                     MillUserHandler;
-    WDTZero                         MillWatchDog;
-    WebHandler                      MillWebHandler;
+    String currentUser;
 
-    String                          currentUser;
+    char key;
+    char oldKey;
+    char tempOldKey;
+    char currentStatus;
 
-    char                            key;
-    char                            oldKey;
-    char                            tempOldKey;
-    char                            currentStatus;
+    bool updateDisplay = true;
 
-    bool updateDisplay              = true;
-    bool webHandlerActive           = false;
+    int localKey = 0;
+    int localKeyDisplayed = 0;
+    int activeKeyElement = 0;
+    int activeKeyElementDisplayed = 0;
 
-    int localKey                    = 0;
-    int localKeyDisplayed           = 0;
-    int activeKeyElement            = 0;
-    int activeKeyElementDisplayed   = 0;
+    int activeProgress = 0;
+    int tempProgress = 0;
 
-    int activeProgress              = 0;
-    int tempProgress                = 0;
+    int activeUser = 0;
+    int activeCredit = 0;
 
-    int activeUser                  = 0;
-    int activeCredit                = 0;
+    unsigned long tiSingle = 0;
+    unsigned long tiDouble = 0;
+    unsigned long tiRemaining = 0;
 
-    unsigned long tiSingle          = 0;
-    unsigned long tiDouble          = 0;
-    unsigned long tiRemaining       = 0;
+    unsigned long tiStart = 0;
+    unsigned long tiCurrentTime = 0;
+    unsigned long tiDelat = 0;
+    unsigned long tiInStopState = 0;
+    unsigned long tiStopBegin = 0;
+    unsigned long tiPassed = 0;
 
-    unsigned long tiStart           = 0;
-    unsigned long tiCurrentTime     = 0;
-    unsigned long tiDelat           = 0;
-    unsigned long tiInStopState     = 0;
-    unsigned long tiStopBegin       = 0;
-    unsigned long tiPassed          = 0;
+    unsigned long tiLeftDown = 0;
+    unsigned long tiDeltaLeftDown = 0;
+    unsigned long tiRightDown = 0;
+    unsigned long tiDeltaRightDown = 0;
+    unsigned long tiBothDown = 0;
+    unsigned long tiDeltaBothDown = 0;
 
-    unsigned long tiLeftDown        = 0;
-    unsigned long tiDeltaLeftDown   = 0;
-    unsigned long tiRightDown       = 0;
-    unsigned long tiDeltaRightDown  = 0;
-    unsigned long tiBothDown        = 0;
-    unsigned long tiDeltaBothDown   = 0;
-
-    unsigned long tiTimer100ms      = 0;
-    unsigned long tiTimer50ms       = 0;
+    unsigned long tiTimer100ms = 0;
+    unsigned long tiTimer50ms = 0;
 };
 
 #endif
