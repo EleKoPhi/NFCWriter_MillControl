@@ -126,6 +126,12 @@
 #define STOP2_y 52
 #define STOP_font u8g2_font_logisoso16_tr
 
+#define NVM_ERROR_txt_1 "Config Error"
+#define NVM_ERROR_1_y 28
+#define NVM_ERROR_txt_2 "<- Weiter ->"
+#define NVM_ERROR_2_y 52
+#define NVM_Error_font u8g2_font_logisoso16_tr
+
 #define KMNEXT_txt "Km nEXt"
 #define KMNEXT_y 44
 #define KMNEXT_font u8g2_font_logisoso24_tr

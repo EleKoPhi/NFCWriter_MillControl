@@ -1,4 +1,0 @@
-1. Debounce
-Add two capacitor to the switches, for HW debounce.
-Additionaly to SW debounce.
-Lowpass, or only the capacitor

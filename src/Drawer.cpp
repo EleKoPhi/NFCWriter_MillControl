@@ -255,6 +255,15 @@ void Drawer::DrawStopState()
         GetDisplay().sendBuffer();
 }
 
+void Drawer::DrawNvmErrorState()
+{
+        GetDisplay().clearBuffer();
+        GetDisplay().setFont(NVM_Error_font);
+        DrawCenteredText(NVM_ERROR_txt_1, NVM_ERROR_1_y);
+        DrawCenteredText(NVM_ERROR_txt_2, NVM_ERROR_2_y);
+        GetDisplay().sendBuffer();
+}
+
 void Drawer::DrawKeyInput(int actualKey, int activeKeyElement)
 {
         GetDisplay().clearBuffer();

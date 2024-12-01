@@ -33,6 +33,7 @@ public:
     void DrawSystemError();
     void DrawFreeState();
     void DrawStopState();
+    void DrawNvmErrorState();
     void DrawKeyInput(int actualKey, int activeKeyElement);
 
     int GetScreensaverSize();

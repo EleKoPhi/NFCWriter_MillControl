@@ -47,6 +47,9 @@ public:
         bool &GetNFCStatus();
         void SetNFCStatus(bool Status);
 
+        bool &GetConfigStatus();
+        void SetConfigStatus(bool Status);
+
         String getLastUser();
 
         String &GetUser();
@@ -83,6 +86,7 @@ private:
         int UserKey;
 
         bool NfcStatus;
+        bool ConfigStatus;
 
         static bool KeyLeft;
         static bool KeyRight;

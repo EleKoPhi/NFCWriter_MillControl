@@ -21,9 +21,12 @@
 #define DEFAULT_SSID "TEST123TEST"
 #define DEFAULT_TIMEDOUBLE 20000
 #define DEFAULT_TIMESINGLE 10000
+#define DEFAULT_TIMEDOUBLE_MAX 40000
+#define DEFAULT_TIMESINGLE_MAX 40000
 #define DEFAULT_CHIPPAGE 0x06 // V1 :4 // V2 :5 // SN007: 6 // Default: 0
 #define DEFAULT_KEY 10
 #define DEFAULT_Split 1
+#define DEFAULT_CRC 0x00
 
 // LOG DEFINES
 
@@ -34,14 +37,12 @@
 
 // NFC KEYS
 
-#define PW_BUFFER              \
-    {                          \
-        0xFF, 0xAB, 0xBA, 0xFF \
-    }
+#define PW_BUFFER \
+    {             \
+        0xFF, 0xAB, 0xBA, 0xFF}
 #define ACK_BUFFER \
     {              \
-        0xE, 0x5   \
-    }
+        0xE, 0x5}
 
 // MIN MAX TIMES
 

@@ -10,10 +10,13 @@
 byte PSWBuff[] = PW_BUFFER;
 byte pACK[] = ACK_BUFFER;
 
-Preferences nvm_storage;
+Preferences nvm_storage_1;
+Preferences nvm_storage_2;
 
 bool &UserHandler::GetNFCStatus() { return NfcStatus; }
 void UserHandler::SetNFCStatus(bool Status) { NfcStatus = Status; }
+bool &UserHandler::GetConfigStatus() { return ConfigStatus; }
+void UserHandler::SetConfigStatus(bool Status) { ConfigStatus = Status; }
 String &UserHandler::GetUser() { return User; }
 void UserHandler::SetUser(String user) { User = user; }
 MFRC522 &UserHandler::GetNFCReader() { return _nfcReader; }
@@ -28,6 +31,26 @@ bool &UserHandler::GetStBoth() { return KeyBoth; }
 void UserHandler::SetStBoth(bool st) { KeyBoth = st; }
 
 void UserHandler::StartKeyDebounce() { debounce = millis(); };
+
+uint32_t simple_crc(uint32_t value1, uint32_t value2);
+uint32_t simple_crc(uint32_t value1, uint32_t value2)
+{
+        // Combine the two values using XOR
+        uint32_t combined = value1 ^ value2;
+
+        // Compute a basic checksum using a shift and XOR loop
+        uint32_t crc = 0;
+        for (int i = 0; i < 32; ++i)
+        {
+                if (combined & 1)
+                {                    // Check the least significant bit
+                        crc ^= 0x1D; // Use a simple polynomial (0x1D here for demonstration)
+                }
+                combined >>= 1; // Right shift the combined value
+        }
+        return crc;
+}
+
 byte UserHandler::DebounceFinished(unsigned long max, unsigned long min)
 {
         if ((millis() - GetTimer()) > max)
@@ -61,21 +84,53 @@ UserHandler::UserHandler(int chipSelect, int slaveSelect, int rstPin) : _nfcRead
 bool UserHandler::loadConfiguration()
 {
 
-        nvm_storage.begin("mill_times", false);
-
-        config.single_time = nvm_storage.getUInt("ti_single", DEFAULT_TIMESINGLE);
-        config.double_time = nvm_storage.getUInt("ti_double", DEFAULT_TIMEDOUBLE);
-
         config.chipPage = DEFAULT_CHIPPAGE;
         config.key = DEFAULT_KEY;
         config.split = DEFAULT_Split;
 
-        if (config.single_time == 0 || config.single_time == 0)
+        uint32_t single_time_1 = 0;
+        uint32_t single_time_2 = 0;
+        uint32_t double_time_1 = 0;
+        uint32_t double_time_2 = 0;
+        uint8_t crc_1 = 0;
+        uint8_t crc_2 = 0;
+        uint8_t crc_1_local = 0;
+        uint8_t crc_2_local = 0;
+
+        nvm_storage_1.begin("mill_times_1", true);
+        single_time_1 = nvm_storage_1.getUInt("ti_single", DEFAULT_TIMESINGLE);
+        double_time_1 = nvm_storage_1.getUInt("ti_double", DEFAULT_TIMEDOUBLE);
+        crc_1 = nvm_storage_1.getUInt("crc", DEFAULT_CRC);
+        nvm_storage_1.end();
+
+        crc_1_local = simple_crc(single_time_1, double_time_1);
+
+        nvm_storage_2.begin("mill_times_2", true);
+        single_time_2 = nvm_storage_2.getUInt("ti_single", DEFAULT_TIMESINGLE);
+        double_time_2 = nvm_storage_2.getUInt("ti_double", DEFAULT_TIMEDOUBLE);
+        crc_2 = nvm_storage_2.getUInt("crc", DEFAULT_CRC);
+        nvm_storage_2.end();
+
+        crc_2_local = simple_crc(single_time_2, double_time_2);
+
+        if (crc_1_local == crc_1 && single_time_1 != 0 && double_time_1 != 0)
         {
-                Serial.println("NVM Error");
+                config.single_time = single_time_1;
+                config.double_time = double_time_1;
+                return true;
+        }
+        else if (crc_2_local == crc_2 && single_time_2 != 0 && double_time_2 != 0)
+        {
+                config.single_time = single_time_2;
+                config.double_time = double_time_2;
+                return true;
+        }
+        else
+        {
+                config.single_time = DEFAULT_TIMESINGLE;
+                config.double_time = DEFAULT_TIMEDOUBLE;
                 return false;
         }
-        return true;
 }
 
 void UserHandler::ResetInput()
@@ -101,7 +156,7 @@ void UserHandler::begin()
         pinMode(taster_RECHTS_pin, INPUT);
         attachInterrupt(digitalPinToInterrupt(taster_RECHTS_pin), ISR_Right, CHANGE);
 
-        loadConfiguration();
+        SetConfigStatus(loadConfiguration());
 }
 
 bool UserHandler::AuthenticateUser(int localKey)
@@ -328,9 +383,18 @@ bool UserHandler::saveConfiguration(int tiSingle, int tiDobule)
                 return false;
         }
 
-        nvm_storage.putUInt("ti_single", uint32_t(tiSingle));
-        nvm_storage.putUInt("ti_double", uint32_t(tiDobule));
-        nvm_storage.end();
+        nvm_storage_1.begin("mill_times_1", false);
+        nvm_storage_1.putUInt("ti_single", uint32_t(tiSingle));
+        nvm_storage_1.putUInt("ti_double", uint32_t(tiDobule));
+        nvm_storage_1.putUInt("crc", simple_crc(uint32_t(tiSingle), uint32_t(tiDobule)));
+        nvm_storage_1.end();
+
+        nvm_storage_2.begin("mill_times_2", false);
+        nvm_storage_2.putUInt("ti_single", uint32_t(tiSingle));
+        nvm_storage_2.putUInt("ti_double", uint32_t(tiDobule));
+        nvm_storage_2.putUInt("crc", simple_crc(uint32_t(tiSingle), uint32_t(tiDobule)));
+        nvm_storage_2.end();
+
         Serial.println("Saved mill time to NVM!");
         return true;
 }

@@ -162,6 +162,10 @@ char Controller::tr_WaitForUser()
         {
                 return StateBegin(SceenSaferState);
         }
+        else if (GetUserHandler().GetConfigStatus() == false)
+        {
+                return StateBegin(NVMError);
+        }
         else
         {
                 return GetCurrentStatus();
@@ -261,6 +265,27 @@ char Controller::tr_ShowLastUser()
                 return GetCurrentStatus();
         }
 }
+
+char Controller::tr_NVMError()
+{
+        if (GetCurrentKeyFlag() == LEFT_KEY)
+        {
+                return StateBegin(AdaptTiSingle);
+        }
+        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        {
+                return StateBegin(AdaptTiSingle);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        {
+                return StateBegin(WaitForUser);
+        }
+        else
+        {
+                return GetCurrentStatus();
+        }
+}
+
 char Controller::tr_Screensafer()
 {
         SetStartTime(millis());
@@ -437,7 +462,13 @@ char Controller::tr_AdaptTiDouble()
                 GetUserHandler().ResetInput();
                 return AdaptTiDouble;
         }
-        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        else if (GetCurrentKeyFlag() == BOTH_KEY && GetUserHandler().GetConfigStatus() == false)
+        {
+                GetUserHandler().saveConfiguration(GetTimeSingle(), GetTimeDouble());
+                GetUserHandler().SetConfigStatus(true);
+                return StateBegin(WaitForUser);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY && GetUserHandler().GetConfigStatus() == true)
         {
                 GetUserHandler().saveConfiguration(GetTimeSingle(), GetTimeDouble());
                 return StateBegin(WaitForUser);
@@ -463,7 +494,12 @@ char Controller::tr_AdaptTiSingle()
                 GetUserHandler().ResetInput();
                 return AdaptTiSingle;
         }
-        else if (GetCurrentKeyFlag() == BOTH_KEY)
+        else if (GetCurrentKeyFlag() == BOTH_KEY && GetUserHandler().GetConfigStatus() == false)
+        {
+                // GetUserHandler().saveConfiguration(GetTimeSingle(), GetTimeDouble());
+                return StateBegin(AdaptTiDouble);
+        }
+        else if (GetCurrentKeyFlag() == BOTH_KEY && GetUserHandler().GetConfigStatus() == true)
         {
                 GetUserHandler().saveConfiguration(GetTimeSingle(), GetTimeDouble());
                 return StateBegin(WaitForUser);
@@ -721,7 +757,7 @@ void Controller::Begin()
         // Read time for singe and double from config file
         SetTimeSingle(GetUserHandler().config.single_time);
         SetTimeDouble(GetUserHandler().config.double_time);
-        
+
         // If there is a problem with NFC, display the error states
         GetDrawer().DrawSystemStatus(GetUserHandler().GetNFCStatus());
 
@@ -845,6 +881,8 @@ char Controller::StateTransitions()
                         return (tr_DoneState());
                 case ShowLastUser:
                         return (tr_ShowLastUser());
+                case NVMError:
+                        return (tr_NVMError());
                 default:
                         return (tr_WaitForUser());
                 };
@@ -1134,6 +1172,14 @@ void Controller::States(char state)
                                 SetUpdateDisplay(false);
                         }
                         TimeOut(TIMEOUT_LONG);
+                }
+                else if (state == NVMError)
+                {
+                        if (GetUpdateDisplay())
+                        {
+                                GetDrawer().DrawNvmErrorState();
+                                SetUpdateDisplay(false);
+                        }
                 }
                 else
                 {

@@ -49,6 +49,7 @@ public:
     char tr_RepayState();
     char tr_DoneState();
     char tr_ShowLastUser();
+    char tr_NVMError();
 
     // Activation of mill
 
