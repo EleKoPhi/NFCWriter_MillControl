@@ -1,0 +1,1 @@
+# Load Terminal_1.stl and Terminal_3 together into the slicer, to allow the multicolor print!
