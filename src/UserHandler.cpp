@@ -251,17 +251,21 @@ bool UserHandler::HasCardToRead()
         {
                 return false;
         }
-        else
-        {
-                return true;
-        }
+
+        // Select the presented card so read/write commands can run in the same state cycle.
+        return GetNFCReader().PICC_ReadCardSerial();
 }
 
 String UserHandler::GetCardId()
 {
         long _code = 0;
 
-        if (GetNFCReader().PICC_ReadCardSerial())
+        if (GetNFCReader().uid.size == 0 && !GetNFCReader().PICC_ReadCardSerial())
+        {
+                return String(0, DEC);
+        }
+
+        if (GetNFCReader().uid.size > 0)
         {
                 for (byte i = 0; i < GetNFCReader().uid.size; i++)
                 {
@@ -288,10 +292,15 @@ int UserHandler::ReadCredit()
         byte _buffer[18];
         byte _byteCount;
         int _status = 0;
+        byte _pwBufer[] = PW_BUFFER;
+        byte _pACK[] = ACK_BUFFER;
 
         _byteCount = sizeof(_buffer);
 
-        _status = GetNFCReader().MIFARE_Read(0x06, _buffer, &_byteCount);
+        // Keep this behavior aligned with NFCWriter_Terminal: auth then read page.
+        GetNFCReader().PCD_NTAG216_AUTH(&_pwBufer[0], _pACK);
+
+        _status = GetNFCReader().MIFARE_Read(config.chipPage, _buffer, &_byteCount);
 
         Serial.println(_buffer[0]);
         Serial.println(_buffer[1]);
@@ -316,27 +325,21 @@ int UserHandler::WriteCredit(int newCredit, bool paymentType)
 
         byte _pwBufer[] = PW_BUFFER;
         byte _pACK[] = ACK_BUFFER;
-        byte _writeBuffer[] = {newCredit, newCredit, newCredit, newCredit};
-        int _stat = 0;
-
-        ReadCredit();
-        GetNFCReader().PCD_NTAG216_AUTH(&_pwBufer[0], _pACK);
-        _stat = GetNFCReader().MIFARE_Ultralight_Write(0x06, _writeBuffer, 4); // EE-5 KM CP = 0x04
-
-        if (_stat != 0)
+        if (newCredit < 0 || newCredit > 255)
         {
                 return -1;
         }
 
-        ReadCredit();
+        byte _creditAsByte = static_cast<byte>(newCredit);
+        byte _writeBuffer[] = {_creditAsByte, _creditAsByte, _creditAsByte, _creditAsByte};
+        int _stat = 0;
 
-        int _testCount = 0;
+        GetNFCReader().PCD_NTAG216_AUTH(&_pwBufer[0], _pACK);
+        _stat = GetNFCReader().MIFARE_Ultralight_Write(config.chipPage, _writeBuffer, 4);
 
-        while (!HasCardToRead())
+        if (_stat != 0)
         {
-                _testCount++;
-                if (_testCount > 10)
-                        return -1;
+                return -1;
         }
 
         SetUser(String(GetCardId().toInt()));

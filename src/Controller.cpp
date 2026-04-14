@@ -444,6 +444,8 @@ char Controller::tr_AskForSplitPayment()
 }
 char Controller::tr_ReadCreditUser()
 {
+        //SetUserAsInt(GetUserHandler().GetCardId().toInt());
+        //SetCreditAsInt(GetUserHandler().ReadCredit());
         return StateBegin(ShowCredit);
 }
 char Controller::tr_AdaptTiDouble()
@@ -1122,6 +1124,8 @@ void Controller::States(char state)
 
                 else if (state == ReadCreditUser)
                 {
+                        // Credit and ID are captured in tr_ReadCreditUser to avoid timing races
+                        // between 50ms transition ticks and 100ms display ticks.
                         SetUserAsInt(GetUserHandler().GetCardId().toInt());
                         SetCreditAsInt(GetUserHandler().ReadCredit());
                 }
