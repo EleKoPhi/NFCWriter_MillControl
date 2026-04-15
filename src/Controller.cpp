@@ -4,6 +4,18 @@
 #include "Controller.h"
 #include "Controller_defines.h"
 #include <SPI.h>
+#include "LogManager.h"
+#include "MillWiFi.h"
+
+static void serviceNetworkDelay(unsigned long ms)
+{
+        unsigned long start = millis();
+        while ((millis() - start) < ms)
+        {
+                MillWiFi::getInstance().handle();
+                delay(1);
+        }
+}
 
 Controller::Controller(int chipSelect, int slaveSelect, int rstPin, int clk, int data) : MillDrawer(clk, data), MillUserHandler(chipSelect, slaveSelect, rstPin) {}
 
@@ -137,14 +149,11 @@ char Controller::tr_WaitForUser()
         }
         else if (GetCurrentKeyFlag() == RIGHT_KEY)
         {
-                if (GetUserHandler().config.split == 1)
-                {
-                        return StateBegin(AskForSplitPayment);
-                }
-                else
-                {
-                        return StateBegin(PayTwo);
-                }
+#ifdef SPLIT_ENABLED
+                return StateBegin(AskForSplitPayment);
+#else
+                return StateBegin(PayTwo);
+#endif
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
@@ -227,7 +236,11 @@ char Controller::tr_ShowCredit()
         }
         else if (GetCurrentKeyFlag() == RIGHT_KEY)
         {
+#ifdef SPLIT_ENABLED
                 return StateBegin(AskForSplitPayment);
+#else
+                return StateBegin(PayTwo);
+#endif
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
@@ -250,7 +263,11 @@ char Controller::tr_ShowLastUser()
         }
         else if (GetCurrentKeyFlag() == RIGHT_KEY)
         {
+#ifdef SPLIT_ENABLED
                 return StateBegin(AskForSplitPayment);
+#else
+                return StateBegin(PayTwo);
+#endif
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
@@ -296,7 +313,11 @@ char Controller::tr_Screensafer()
         }
         else if (GetCurrentKeyFlag() == RIGHT_KEY)
         {
+#ifdef SPLIT_ENABLED
                 return StateBegin(AskForSplitPayment);
+#else
+                return StateBegin(PayTwo);
+#endif
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
@@ -423,6 +444,7 @@ char Controller::tr_FreePullState()
                 return GetCurrentStatus();
         }
 }
+#ifdef SPLIT_ENABLED
 char Controller::tr_AskForSplitPayment()
 {
         if (GetCurrentKeyFlag() == LEFT_KEY)
@@ -442,6 +464,7 @@ char Controller::tr_AskForSplitPayment()
                 return GetCurrentStatus();
         }
 }
+#endif  // SPLIT_ENABLED
 char Controller::tr_ReadCreditUser()
 {
         //SetUserAsInt(GetUserHandler().GetCardId().toInt());
@@ -530,7 +553,8 @@ char Controller::tr_PayOne()
 
                         if (_status == _Ok)
                         {
-                                delay(DELAY_MILL_ON);
+                                GetUserHandler().WriteToLog(-PRICE_SINGE, _credit - PRICE_SINGE);
+                                serviceNetworkDelay(DELAY_MILL_ON);
                                 MillOn();
                                 return StateBegin(Single);
                         }
@@ -542,17 +566,20 @@ char Controller::tr_PayOne()
                                         if (_status == _Ok)
                                                 break;
                                         _counter++;
+                                        MillWiFi::getInstance().handle();
+                                        delay(1);
                                 }
 
                                 if (_counter >= ERROR_RETRY_WRITING)
                                 {
                                         GetDrawer().DrawSystemError();
-                                        delay(DELAY_AFTER_ERROR);
+                                        serviceNetworkDelay(DELAY_AFTER_ERROR);
                                         return StateBegin(WaitForUser);
                                 }
                                 else
                                 {
-                                        delay(DELAY_MILL_ON);
+                                        GetUserHandler().WriteToLog(-PRICE_SINGE, _credit - PRICE_SINGE);
+                                        serviceNetworkDelay(DELAY_MILL_ON);
                                         MillOn();
                                         return StateBegin(Single);
                                 }
@@ -591,7 +618,8 @@ char Controller::tr_PayTwo()
 
                         if (_status == _Ok)
                         {
-                                delay(DELAY_MILL_ON);
+                                GetUserHandler().WriteToLog(-PRICE_DOUBLE, _credit - PRICE_DOUBLE);
+                                serviceNetworkDelay(DELAY_MILL_ON);
                                 MillOn();
                                 return StateBegin(Double);
                         }
@@ -603,17 +631,20 @@ char Controller::tr_PayTwo()
                                         if (_status == _Ok)
                                                 break;
                                         _counter++;
+                                        MillWiFi::getInstance().handle();
+                                        delay(1);
                                 }
 
                                 if (_counter >= ERROR_RETRY_WRITING)
                                 {
                                         GetDrawer().DrawSystemError();
-                                        delay(DELAY_AFTER_ERROR);
+                                        serviceNetworkDelay(DELAY_AFTER_ERROR);
                                         return StateBegin(WaitForUser);
                                 }
                                 else
                                 {
-                                        delay(DELAY_MILL_ON);
+                                        GetUserHandler().WriteToLog(-PRICE_DOUBLE, _credit - PRICE_DOUBLE);
+                                        serviceNetworkDelay(DELAY_MILL_ON);
                                         MillOn();
                                         return StateBegin(Double);
                                 }
@@ -633,6 +664,7 @@ char Controller::tr_PayTwo()
                 return GetCurrentStatus();
         }
 }
+#ifdef SPLIT_ENABLED
 char Controller::tr_PayTwo_1()
 {
         if (GetUserHandler().HasCardToRead())
@@ -647,11 +679,14 @@ char Controller::tr_PayTwo_1()
                 if (_credit >= PRICE_SINGE)
                 {
                         MillUserHandler.WriteCredit(_credit - PRICE_SINGE, false);
+                        GetUserHandler().WriteToLog(-PRICE_SINGE, _credit - PRICE_SINGE);
                         MillUserHandler.newRead();
                         while (GetCurrentUser() == ZERO_STRING || GetCurrentUser() == "")
                         {
                                 SetCurrentUser(GetUserHandler().GetCardId());
                                 GetUserHandler().ReadCredit();
+                                MillWiFi::getInstance().handle();
+                                delay(1);
                         }
                         return StateBegin(PayTwo_2);
                 }
@@ -680,7 +715,8 @@ char Controller::tr_PayTwo_2()
                 if ((_credit >= PRICE_SINGE) && (GetCurrentUser() != _currentUser) && (_currentUser != ZERO_STRING))
                 {
                         GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
-                        delay(DELAY_MILL_ON);
+                        GetUserHandler().WriteToLog(-PRICE_SINGE, _credit - PRICE_SINGE);
+                        serviceNetworkDelay(DELAY_MILL_ON);
                         MillOn();
                         return StateBegin(Double);
                 }
@@ -711,6 +747,7 @@ char Controller::tr_RepayState()
                 else
                 {
                         GetUserHandler().WriteCredit(_credit + PRICE_SINGE, false);
+                        GetUserHandler().WriteToLog(+PRICE_SINGE, _credit + PRICE_SINGE);
                         return StateBegin(DoneState);
                 }
         }
@@ -719,6 +756,7 @@ char Controller::tr_RepayState()
                 return GetCurrentStatus();
         }
 }
+#endif  // SPLIT_ENABLED
 char Controller::tr_DoneState()
 {
         if (!(GetUserHandler().HasCardToRead()))
@@ -861,8 +899,10 @@ char Controller::StateTransitions()
                         return (tr_StopState());
                 case FreePullState:
                         return (tr_FreePullState());
+#ifdef SPLIT_ENABLED
                 case AskForSplitPayment:
                         return (tr_AskForSplitPayment());
+#endif
                 case ReadCreditUser:
                         return (tr_ReadCreditUser());
                 case AdaptTiSingle:
@@ -873,12 +913,14 @@ char Controller::StateTransitions()
                         return (tr_PayOne());
                 case PayTwo:
                         return (tr_PayTwo());
+#ifdef SPLIT_ENABLED
                 case PayTwo_1:
                         return (tr_PayTwo_1());
                 case PayTwo_2:
                         return (tr_PayTwo_2());
                 case RepayState:
                         return (tr_RepayState());
+#endif
                 case DoneState:
                         return (tr_DoneState());
                 case ShowLastUser:
@@ -1062,6 +1104,7 @@ void Controller::States(char state)
                         GetDrawer().DrawScreenSafer(millis());
                 }
 
+#ifdef SPLIT_ENABLED
                 else if (state == AskForSplitPayment)
                 {
                         if (GetUpdateDisplay())
@@ -1071,6 +1114,7 @@ void Controller::States(char state)
                         }
                         TimeOut(TIMEOUT_DEFAULT);
                 }
+#endif
 
                 else if (state == SelectTiToAdapt)
                 {
@@ -1092,6 +1136,7 @@ void Controller::States(char state)
                         TimeOut(TIMEOUT_DEFAULT);
                 }
 
+#ifdef SPLIT_ENABLED
                 else if (state == PayTwo_1)
                 {
                         if (GetUpdateDisplay())
@@ -1111,6 +1156,7 @@ void Controller::States(char state)
                         }
                         TimeOutWithBackPay(TIMEOUT_LONG);
                 }
+#endif
 
                 else if (state == LowCredit)
                 {
@@ -1144,11 +1190,13 @@ void Controller::States(char state)
                         }
                         TimeOut(TIMEOUT_SHORT);
                 }
+#ifdef SPLIT_ENABLED
                 else if (state == RepayState)
                 {
                         GetDrawer().DrawReplay(GetTimeDelta() / (TIMEOUT_REPAY / HUNDRED_PERCENT));
                         TimeOut(TIMEOUT_REPAY);
                 }
+#endif
                 else if (state == DoneState)
                 {
                         if (GetUpdateDisplay())

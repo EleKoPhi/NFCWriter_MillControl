@@ -6,6 +6,7 @@
 #include "UserHandler_defines.h"
 #include <EEPROM.h>
 #include <Preferences.h>
+#include "LogManager.h"
 
 byte PSWBuff[] = PW_BUFFER;
 byte pACK[] = ACK_BUFFER;
@@ -283,8 +284,21 @@ String UserHandler::GetTimeStamp()
         return _moment;
 }
 
-void UserHandler::WriteToLog(String userID, String credit, bool isDouble)
+void UserHandler::GetRawUID(uint8_t buf[7])
 {
+        memset(buf, 0, 7);
+        byte sz = GetNFCReader().uid.size;
+        if (sz > 7)
+                sz = 7;
+        for (byte i = 0; i < sz; i++)
+                buf[i] = GetNFCReader().uid.uidByte[i];
+}
+
+void UserHandler::WriteToLog(int8_t delta, int16_t creditAfter)
+{
+        uint8_t uid[7];
+        GetRawUID(uid);
+        LogManager::getInstance().append(uid, delta, creditAfter);
 }
 
 int UserHandler::ReadCredit()
@@ -374,6 +388,7 @@ void UserHandler::newRead()
 {
         while (!GetNFCReader().PICC_IsNewCardPresent())
         {
+                delay(1);
         };
 }
 

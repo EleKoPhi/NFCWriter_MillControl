@@ -35,6 +35,10 @@
 #define DOUBLE "D"
 #define UNKNOWN_USER_STRING "Unbekannt"
 
+// CARDLOG DEFINES
+
+#define LOG_MAX_ENTRIES 1024
+
 // NFC KEYS
 
 #define PW_BUFFER \

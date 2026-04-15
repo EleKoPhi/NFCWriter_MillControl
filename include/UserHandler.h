@@ -31,7 +31,8 @@ public:
         bool HasCardToRead();
         String GetCardId();
         String GetTimeStamp();
-        void WriteToLog(String userID, String credit, bool doppelt);
+        void WriteToLog(int8_t delta, int16_t creditAfter = -1);
+        void GetRawUID(uint8_t buf[7]);
         int ReadCredit();
         int WriteCredit(int newCredit, bool doppelt);
         String ID();

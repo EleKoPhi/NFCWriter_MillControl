@@ -38,16 +38,18 @@ public:
     char tr_StopState();
     char tr_FinishState();
     char tr_FreePullState();
-    char tr_AskForSplitPayment();
     char tr_ReadCreditUser();
     char tr_AdaptTiSingle();
     char tr_AdaptTiDouble();
     char tr_PayOne();
     char tr_PayTwo();
+    char tr_DoneState();
+#ifdef SPLIT_ENABLED
+    char tr_AskForSplitPayment();
     char tr_PayTwo_1();
     char tr_PayTwo_2();
     char tr_RepayState();
-    char tr_DoneState();
+#endif
     char tr_ShowLastUser();
     char tr_NVMError();
 
