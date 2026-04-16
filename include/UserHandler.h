@@ -61,15 +61,15 @@ public:
         int &GetUserKey();
         void SetUserKey(int key);
 
-        static bool &GetStLeft();
+        static bool GetStLeft();
         static void SetStLeft(bool st);
-        static bool &GetStRigth();
+        static bool GetStRigth();
         static void SetStRight(bool st);
-        static bool &GetStBoth();
+        static bool GetStBoth();
         static void SetStBoth(bool st);
         static void ResetInput();
 
-        static unsigned long &GetTimer();
+        static unsigned long GetTimer();
         static void SetTimer(long ti);
 
         static void StartKeyDebounce();
@@ -89,11 +89,11 @@ private:
         bool NfcStatus;
         bool ConfigStatus;
 
-        static bool KeyLeft;
-        static bool KeyRight;
-        static bool KeyBoth;
+        static volatile bool KeyLeft;
+        static volatile bool KeyRight;
+        static volatile bool KeyBoth;
 
-        static unsigned long debounce;
+        static volatile unsigned long debounce;
 };
 
 #endif

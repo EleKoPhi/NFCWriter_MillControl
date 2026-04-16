@@ -6,6 +6,12 @@ Nfc_MillControl_V2 is the updated version of Nfc_MillControl_V1.
 
 The project upgrades an analog coffee grinder with NFC-based user handling and a small OLED UI.
 
+## User documentation
+
+End-user operating guide:
+
+- [docs/ANWENDERDOKUMENTATION.md](docs/ANWENDERDOKUMENTATION.md)
+
 ## Project configuration
 
 The project is configured for PlatformIO and ESP32 (`nodemcu-32s`):

@@ -24,11 +24,11 @@ MFRC522 &UserHandler::GetNFCReader() { return _nfcReader; }
 void UserHandler::SetUserKey(int key) { UserKey = key; }
 int &UserHandler::GetUserKey() { return UserKey; }
 
-bool &UserHandler::GetStLeft() { return KeyLeft; }
+bool UserHandler::GetStLeft() { return KeyLeft; }
 void UserHandler::SetStLeft(bool st) { KeyLeft = st; }
-bool &UserHandler::GetStRigth() { return KeyRight; }
+bool UserHandler::GetStRigth() { return KeyRight; }
 void UserHandler::SetStRight(bool st) { KeyRight = st; }
-bool &UserHandler::GetStBoth() { return KeyBoth; }
+bool UserHandler::GetStBoth() { return KeyBoth; }
 void UserHandler::SetStBoth(bool st) { KeyBoth = st; }
 
 void UserHandler::StartKeyDebounce() { debounce = millis(); };
@@ -67,14 +67,14 @@ byte UserHandler::DebounceFinished(unsigned long max, unsigned long min)
                 return KEYS_BLOCKED;
         }
 }
-unsigned long &UserHandler::GetTimer() { return debounce; };
+unsigned long UserHandler::GetTimer() { return debounce; };
 void UserHandler::SetTimer(long ti) { debounce = ti; }
 
-bool UserHandler::KeyRight = false;
-bool UserHandler::KeyLeft = false;
-bool UserHandler::KeyBoth = false;
+volatile bool UserHandler::KeyRight = false;
+volatile bool UserHandler::KeyLeft = false;
+volatile bool UserHandler::KeyBoth = false;
 
-unsigned long UserHandler::debounce = 0;
+volatile unsigned long UserHandler::debounce = 0;
 
 UserHandler::UserHandler(int chipSelect, int slaveSelect, int rstPin) : _nfcReader(slaveSelect, rstPin)
 {

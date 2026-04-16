@@ -45,6 +45,7 @@ private:
 
     bool startAp();
     void ensureApHealthy();
+    void logRequest(const char *route);
 
     bool checkAuth();
     void handlePing();

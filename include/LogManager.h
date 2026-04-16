@@ -49,7 +49,7 @@ public:
     bool     begin();
     void     append(const uint8_t uid[7], int8_t delta, int16_t latestCredit = -1);
     uint32_t count() const;
-    uint16_t aggregate(CardSummary *out, uint16_t maxCards) const;
+    uint16_t aggregate(CardSummary *out, uint16_t maxCards, bool *truncated = nullptr) const;
     void     clear();
 
 private:

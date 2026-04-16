@@ -3,12 +3,45 @@
 
 bool MillWiFi::startAp()
 {
+    WiFi.disconnect(true, true);
+    delay(80);
+    WiFi.mode(WIFI_MODE_NULL);
+    delay(50);
     WiFi.mode(WIFI_AP);
-    if (!WiFi.softAP(_ssid.c_str(), _pw.c_str()))
+    WiFi.setSleep(false);
+
+    IPAddress apIp(192, 168, 4, 1);
+    IPAddress gateway(192, 168, 4, 1);
+    IPAddress subnet(255, 255, 255, 0);
+    bool configOk = WiFi.softAPConfig(apIp, gateway, subnet);
+    if (!configOk)
+        Serial.println("[MillWiFi] softAPConfig failed");
+
+    if (!WiFi.softAP(_ssid.c_str(), _pw.c_str(), 1, 0, 4))
         return false;
 
-    Serial.println("[MillWiFi] AP ready: ssid=" + _ssid + " ip=" + WiFi.softAPIP().toString());
+    delay(300);
+    Serial.println(
+        "[MillWiFi] AP ready: ssid=" + _ssid
+        + " ip=" + WiFi.softAPIP().toString()
+        + " mac=" + WiFi.softAPmacAddress()
+        + " channel=" + String(WiFi.channel())
+    );
     return true;
+}
+
+void MillWiFi::logRequest(const char *route)
+{
+    String remote = "-";
+    if (_server.client())
+        remote = _server.client().remoteIP().toString();
+
+    Serial.println(
+        String("[MillWiFi] request route=") + route
+        + " method=" + String((int)_server.method())
+        + " remote=" + remote
+        + " uri=" + _server.uri()
+    );
 }
 
 void MillWiFi::ensureApHealthy()
@@ -49,10 +82,19 @@ bool MillWiFi::begin()
     _authKey       = prefs.getString(MILL_WIFI_KEY_AUTH,  MILL_WIFI_DEFAULT_AUTH_KEY);
     prefs.end();
 
+    Serial.println(
+        "[MillWiFi] begin ssid=" + _ssid
+        + " pwLen=" + String(_pw.length())
+        + " authLen=" + String(_authKey.length())
+    );
+
     WiFi.persistent(false);
     WiFi.setSleep(false);
     if (!startAp())
         return false;
+
+    const char *headerKeys[] = {"Authorization"};
+    _server.collectHeaders(headerKeys, 1);
 
     _server.on("/ping",  HTTP_GET,    [this]() { handlePing(); });
     _server.on("/logs",  HTTP_GET,    [this]() { handleGetLogs(); });
@@ -71,33 +113,44 @@ void MillWiFi::handle()
     {
         ensureApHealthy();
         _server.handleClient();
+        delay(0);
     }
 }
 
 bool MillWiFi::checkAuth()
 {
     if (!_server.hasHeader("Authorization"))
+    {
+        Serial.println("[MillWiFi] auth missing");
         return false;
+    }
     String hdr = _server.header("Authorization");
     String expected = "Bearer " + _authKey;
+    Serial.println(
+        "[MillWiFi] auth received len=" + String(hdr.length())
+        + " expected len=" + String(expected.length())
+    );
     return hdr == expected;
 }
 
 void MillWiFi::handlePing()
 {
+    logRequest("/ping");
     _server.send(200, "text/plain", "pong");
 }
 
 void MillWiFi::handleGetLogs()
 {
+    logRequest("/logs");
     if (!checkAuth())
     {
         _server.send(401, "text/plain", "Unauthorized");
         return;
     }
 
-    // Aggregate all log entries per card in RAM (max 200 unique cards)
-    static const uint16_t MAX_CARDS = 200;
+    // Aggregate all log entries per card in RAM.
+    // If the configured limit is exceeded, fail loudly instead of truncating silently.
+    static const uint16_t MAX_CARDS = 512;
     CardSummary *summary = (CardSummary *)malloc(MAX_CARDS * sizeof(CardSummary));
     if (!summary)
     {
@@ -105,17 +158,31 @@ void MillWiFi::handleGetLogs()
         return;
     }
 
-    uint16_t cardCount = LogManager::getInstance().aggregate(summary, MAX_CARDS);
+    bool truncated = false;
+    uint16_t cardCount = LogManager::getInstance().aggregate(summary, MAX_CARDS, &truncated);
+
+    if (truncated)
+    {
+        free(summary);
+        _server.send(
+            507,
+            "text/plain",
+            "Card limit exceeded. Increase MAX_CARDS or fetch fewer unique cards."
+        );
+        return;
+    }
 
     if (cardCount == 0)
     {
         free(summary);
+        Serial.println("[MillWiFi] /logs empty");
         _server.send(200, "text/plain", "");
         return;
     }
 
-    // Send plain text response without chunked transfer.
-    // This avoids chunk-size marker lines (e.g. "13", "0") on simple clients.
+    // Build the full response in RAM and send it in one shot.
+    // This is more reliable for the ESP8266 HTTP client than incremental
+    // sendContent() streaming, which can otherwise end in read timeouts.
     size_t totalLen = 0;
     for (uint16_t i = 0; i < cardCount; i++)
     {
@@ -138,8 +205,9 @@ void MillWiFi::handleGetLogs()
             totalLen += (size_t)n;
     }
 
-    _server.setContentLength(totalLen);
-    _server.send(200, "text/plain", "");
+    Serial.println("[MillWiFi] /logs cardCount=" + String(cardCount) + " bytes=" + String((unsigned long)totalLen));
+    String payload;
+    payload.reserve(totalLen + 1);
     for (uint16_t i = 0; i < cardCount; i++)
     {
         char uidHex[15];
@@ -157,15 +225,16 @@ void MillWiFi::handleGetLogs()
             (int)summary[i].refunds_given,
             (int)summary[i].latest_credit
         );
-        _server.sendContent(line);
-        delay(0);
+        payload += line;
     }
 
+    _server.send(200, "text/plain", payload);
     free(summary);
 }
 
 void MillWiFi::handleDeleteLogs()
 {
+    logRequest("/logs DELETE");
     if (!checkAuth())
     {
         _server.send(401, "text/plain", "Unauthorized");
@@ -178,6 +247,7 @@ void MillWiFi::handleDeleteLogs()
 
 void MillWiFi::handleResetLogs()
 {
+    logRequest("/logs/reset");
     if (!checkAuth())
     {
         _server.send(401, "text/plain", "Unauthorized");
@@ -190,5 +260,6 @@ void MillWiFi::handleResetLogs()
 
 void MillWiFi::handleNotFound()
 {
+    logRequest("404");
     _server.send(404, "text/plain", "Not found");
 }

@@ -144,10 +144,13 @@ uint32_t LogManager::count() const
     return c;
 }
 
-uint16_t LogManager::aggregate(CardSummary *out, uint16_t maxCards) const
+uint16_t LogManager::aggregate(CardSummary *out, uint16_t maxCards, bool *truncated) const
 {
     if (!_ready || !LittleFS.exists(CARDLOG_FILE) || maxCards == 0)
         return 0;
+
+    if (truncated)
+        *truncated = false;
 
     File f = LittleFS.open(CARDLOG_FILE, "r");
     if (!f)
@@ -177,7 +180,11 @@ uint16_t LogManager::aggregate(CardSummary *out, uint16_t maxCards) const
         if (idx < 0)
         {
             if (cardCount >= maxCards)
+            {
+                if (truncated)
+                    *truncated = true;
                 continue;
+            }
             idx = (int)cardCount++;
             memset(&out[idx], 0, sizeof(CardSummary));
             memcpy(out[idx].uid, e.uid, 7);

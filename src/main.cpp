@@ -18,4 +18,6 @@ void loop()
         MillWiFi::getInstance().handle();
         MillController.UpDateTime();
         MillController.States(MillController.StateTransitions());
+        MillWiFi::getInstance().handle();
+        delay(1);
 }
