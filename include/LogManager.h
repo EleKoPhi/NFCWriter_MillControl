@@ -26,7 +26,7 @@ struct CardSummary
 {
     uint8_t  uid[7];
     uint16_t credits_debited;
-    uint8_t  refunds_given;
+    uint16_t refunds_given;
     int16_t  latest_credit;
 };
 

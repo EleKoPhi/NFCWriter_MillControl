@@ -1,5 +1,14 @@
 #include "MillWiFi.h"
 #include "LogManager.h"
+#include <Preferences.h>
+
+namespace
+{
+    static bool timeReached(unsigned long now, unsigned long target)
+    {
+        return (long)(now - target) >= 0;
+    }
+}
 
 bool MillWiFi::startAp()
 {
@@ -28,6 +37,15 @@ bool MillWiFi::startAp()
         + " channel=" + String(WiFi.channel())
     );
     return true;
+}
+
+void MillWiFi::stopAp()
+{
+    _server.stop();
+    WiFi.softAPdisconnect(true);
+    delay(20);
+    WiFi.mode(WIFI_MODE_NULL);
+    _apRunning = false;
 }
 
 void MillWiFi::logRequest(const char *route)
@@ -90,31 +108,110 @@ bool MillWiFi::begin()
 
     WiFi.persistent(false);
     WiFi.setSleep(false);
-    if (!startAp())
-        return false;
+    WiFi.disconnect(true, true);
+    delay(20);
+    WiFi.mode(WIFI_MODE_NULL);
+    _apRunning = false;
+    _activeUntilMs = 0;
+    _activationDurationMs = 0;
 
     const char *headerKeys[] = {"Authorization"};
     _server.collectHeaders(headerKeys, 1);
 
     _server.on("/ping",  HTTP_GET,    [this]() { handlePing(); });
     _server.on("/logs",  HTTP_GET,    [this]() { handleGetLogs(); });
+    _server.on("/reset-stats", HTTP_GET, [this]() { handleGetResetStats(); });
     _server.on("/logs",  HTTP_DELETE, [this]() { handleDeleteLogs(); });
     _server.on("/logs/reset", HTTP_POST, [this]() { handleResetLogs(); });
     _server.onNotFound(              [this]() { handleNotFound(); });
 
-    _server.begin();
     _ready = true;
     return true;
 }
 
+void MillWiFi::activateFor(unsigned long durationMs)
+{
+    if (durationMs == 0)
+    {
+        deactivate();
+        return;
+    }
+
+    unsigned long now = millis();
+    _activationDurationMs = durationMs;
+    _activeUntilMs = now + durationMs;
+
+    if (_apRunning)
+        return;
+
+    if (startAp())
+    {
+        _server.begin();
+        _apRunning = true;
+        _lastApHealthMs = now;
+    }
+    else
+    {
+        Serial.println("[MillWiFi] AP activation failed");
+    }
+}
+
+void MillWiFi::deactivate()
+{
+    _activeUntilMs = 0;
+    _activationDurationMs = 0;
+    if (_apRunning)
+        stopAp();
+}
+
+uint16_t MillWiFi::getActiveBarPixels(uint16_t maxWidth) const
+{
+    if (!_apRunning || _activationDurationMs == 0 || maxWidth == 0)
+        return 0;
+
+    unsigned long now = millis();
+    if (timeReached(now, _activeUntilMs))
+        return 0;
+
+    unsigned long remaining = _activeUntilMs - now;
+    uint32_t pixels = ((uint32_t)maxWidth * remaining) / _activationDurationMs;
+    if (pixels == 0)
+        pixels = 1;
+    if (pixels > maxWidth)
+        pixels = maxWidth;
+    return (uint16_t)pixels;
+}
+
 void MillWiFi::handle()
 {
-    if (_ready)
+    if (!_ready)
+        return;
+
+    unsigned long now = millis();
+    bool shouldBeActive = (_activationDurationMs != 0) && !timeReached(now, _activeUntilMs);
+
+    if (!shouldBeActive)
     {
-        ensureApHealthy();
-        _server.handleClient();
-        delay(0);
+        if (_apRunning)
+            stopAp();
+        return;
     }
+
+    if (!_apRunning)
+    {
+        if (!startAp())
+        {
+            Serial.println("[MillWiFi] AP lazy-start failed");
+            return;
+        }
+        _server.begin();
+        _apRunning = true;
+        _lastApHealthMs = now;
+    }
+
+    ensureApHealthy();
+    _server.handleClient();
+    delay(0);
 }
 
 bool MillWiFi::checkAuth()
@@ -230,6 +327,27 @@ void MillWiFi::handleGetLogs()
 
     _server.send(200, "text/plain", payload);
     free(summary);
+}
+
+void MillWiFi::handleGetResetStats()
+{
+    logRequest("/reset-stats");
+    if (!checkAuth())
+    {
+        _server.send(401, "text/plain", "Unauthorized");
+        return;
+    }
+
+    Preferences prefs;
+    prefs.begin("reset_stats", true);
+    uint32_t withPull = prefs.getULong("with_pull", 0);
+    uint32_t withoutPull = prefs.getULong("no_pull", 0);
+    prefs.end();
+
+    String payload =
+        String("with_pull=") + String(withPull)
+        + ";no_pull=" + String(withoutPull);
+    _server.send(200, "text/plain", payload);
 }
 
 void MillWiFi::handleDeleteLogs()

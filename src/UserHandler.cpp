@@ -14,6 +14,20 @@ byte pACK[] = ACK_BUFFER;
 Preferences nvm_storage_1;
 Preferences nvm_storage_2;
 
+namespace
+{
+        bool accept_isr_transition(volatile unsigned long &lastInterrupt)
+        {
+                unsigned long now = millis();
+                if ((now - lastInterrupt) < DEBOUNCE_ISR_GUARD_MS)
+                {
+                        return false;
+                }
+                lastInterrupt = now;
+                return true;
+        }
+}
+
 bool &UserHandler::GetNFCStatus() { return NfcStatus; }
 void UserHandler::SetNFCStatus(bool Status) { NfcStatus = Status; }
 bool &UserHandler::GetConfigStatus() { return ConfigStatus; }
@@ -75,6 +89,8 @@ volatile bool UserHandler::KeyLeft = false;
 volatile bool UserHandler::KeyBoth = false;
 
 volatile unsigned long UserHandler::debounce = 0;
+volatile unsigned long UserHandler::lastLeftInterrupt = 0;
+volatile unsigned long UserHandler::lastRightInterrupt = 0;
 
 UserHandler::UserHandler(int chipSelect, int slaveSelect, int rstPin) : _nfcReader(slaveSelect, rstPin)
 {
@@ -167,6 +183,11 @@ bool UserHandler::AuthenticateUser(int localKey)
 
 void UserHandler::ISR_Left()
 {
+        if (!accept_isr_transition(lastLeftInterrupt))
+        {
+                return;
+        }
+
         if (digitalRead(taster_LINKS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == RISING_EDGE_NOT_ALLOWED)
         {
                 return;
@@ -192,6 +213,11 @@ void UserHandler::ISR_Left()
 
 void UserHandler::ISR_Right()
 {
+        if (!accept_isr_transition(lastRightInterrupt))
+        {
+                return;
+        }
+
         if (digitalRead(taster_RECHTS_pin) && DebounceFinished(DEBOUNCE_KEYS_MS_MAX, DEBOUNCE_KEYS_MS_MIN) == RISING_EDGE_NOT_ALLOWED)
         {
                 return;
@@ -254,7 +280,29 @@ bool UserHandler::HasCardToRead()
         }
 
         // Select the presented card so read/write commands can run in the same state cycle.
-        return GetNFCReader().PICC_ReadCardSerial();
+        if (!GetNFCReader().PICC_ReadCardSerial())
+        {
+                return false;
+        }
+
+        MFRC522::PICC_Type piccType = GetNFCReader().PICC_GetType(GetNFCReader().uid.sak);
+        if (piccType != MFRC522::PICC_TYPE_MIFARE_UL)
+        {
+                Serial.println("[NFC] unsupported PICC type");
+                GetNFCReader().PICC_HaltA();
+                GetNFCReader().PCD_StopCrypto1();
+                return false;
+        }
+
+        if (!IsSupportedTagType())
+        {
+                Serial.println("[NFC] ignored unsupported tag type");
+                GetNFCReader().PICC_HaltA();
+                GetNFCReader().PCD_StopCrypto1();
+                return false;
+        }
+
+        return true;
 }
 
 String UserHandler::GetCardId()
@@ -303,6 +351,11 @@ void UserHandler::WriteToLog(int8_t delta, int16_t creditAfter)
 
 int UserHandler::ReadCredit()
 {
+        if (!IsSupportedTagType())
+        {
+                return -1;
+        }
+
         byte _buffer[18];
         byte _byteCount;
         int _status = 0;
@@ -315,11 +368,6 @@ int UserHandler::ReadCredit()
         GetNFCReader().PCD_NTAG216_AUTH(&_pwBufer[0], _pACK);
 
         _status = GetNFCReader().MIFARE_Read(config.chipPage, _buffer, &_byteCount);
-
-        Serial.println(_buffer[0]);
-        Serial.println(_buffer[1]);
-        Serial.println(_buffer[2]);
-        Serial.println(_buffer[3]);
 
         int _key_AND = (_buffer[0] & _buffer[1] & _buffer[2] & _buffer[3]);
         int _key_SUM = ((_buffer[0] + _buffer[1] + _buffer[2] + _buffer[3]) / 4);
@@ -336,6 +384,10 @@ int UserHandler::ReadCredit()
 
 int UserHandler::WriteCredit(int newCredit, bool paymentType)
 {
+        if (!IsSupportedTagType())
+        {
+                return -1;
+        }
 
         byte _pwBufer[] = PW_BUFFER;
         byte _pACK[] = ACK_BUFFER;
@@ -384,12 +436,27 @@ String UserHandler::ID()
         return String(_code, DEC);
 }
 
-void UserHandler::newRead()
+bool UserHandler::newRead(unsigned long timeoutMs)
 {
+        unsigned long start = millis();
         while (!GetNFCReader().PICC_IsNewCardPresent())
         {
+                if ((millis() - start) >= timeoutMs)
+                        return false;
                 delay(1);
-        };
+        }
+        return true;
+}
+
+bool UserHandler::IsSupportedTagType()
+{
+        if (GetNFCReader().uid.size == 0)
+        {
+                return false;
+        }
+
+        MFRC522::PICC_Type piccType = GetNFCReader().PICC_GetType(GetNFCReader().uid.sak);
+        return piccType == MFRC522::PICC_TYPE_MIFARE_UL;
 }
 
 bool UserHandler::saveConfiguration(int tiSingle, int tiDobule)

@@ -12,6 +12,12 @@
 #define sd_CS_pin 26
 #define RelayPin 32
 
+// ESP32 boot note:
+// GPIO0, GPIO12 and GPIO15 are strapping pins. External pullups/pulldowns or
+// peripheral leakage on these pins can prevent a cold power-on boot before
+// firmware starts. If black-screen cold boots persist, move display/button/NFC
+// reset wiring away from strapping pins as the hardware-level fix.
+
 // Key defines
 
 #define LEFT_KEY 'l'
@@ -34,6 +40,11 @@
 #define TIMEOUT_SHORT 5000
 #define TIMEOUT_REPAY 30000
 #define TIME_FOR_PW_ACTIVATION 3000
+#define WIFI_AP_ACTIVE_MS 300000
+#define PAYMENT_SELECTION_HOLD_MS 80
+#define STOP_INPUT_GUARD_MS 750
+#define STOP_MENU_HOLD_MS 100
+#define BOOT_POWER_STABILIZE_MS 250
 
 // Status defines
 

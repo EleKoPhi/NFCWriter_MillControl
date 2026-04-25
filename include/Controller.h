@@ -5,6 +5,7 @@
 #include "UserHandler.h"
 #include "Drawer.h"
 #include <SPI.h>
+#include <esp_system.h>
 
 class Controller
 {
@@ -25,6 +26,11 @@ public:
     void Reset();
 
     void ProcessInput();
+    bool IsSelectionReleased(char keyCode, unsigned long minHoldMs, unsigned long maxHoldMs = 0);
+    bool IsSelectionPressed(char keyCode, unsigned long minHoldMs);
+    bool WriteCreditWithRetry(int targetCredit, bool paymentType);
+    int DebitPresentedCard(int price, bool paymentType, int &creditAfter);
+    int RefundPresentedCard(String expectedUser, int refundCredits, int &creditAfter);
 
     // State transitions
 
@@ -57,6 +63,10 @@ public:
 
     void MillOn();
     void MillOff();
+    void SavePendingPull(char state, unsigned long durationMs);
+    void ClearPendingPull();
+    bool RestorePendingPull();
+    bool IsRecoverableResetReason(esp_reset_reason_t reason) const;
 
     // &Getter and Setter
 
@@ -197,6 +207,7 @@ private:
 
     unsigned long tiTimer100ms = 0;
     unsigned long tiTimer50ms = 0;
+    bool pendingPullActive = false;
 };
 
 #endif

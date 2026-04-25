@@ -199,8 +199,8 @@ uint16_t LogManager::aggregate(CardSummary *out, uint16_t maxCards, bool *trunca
         }
         else if (e.delta > 0)
         {
-            if (out[idx].refunds_given < 255)
-                out[idx].refunds_given++;
+            if ((uint32_t)out[idx].refunds_given + (uint8_t)e.delta <= 65535u)
+                out[idx].refunds_given += (uint8_t)e.delta;
         }
     }
 

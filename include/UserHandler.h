@@ -36,7 +36,8 @@ public:
         int ReadCredit();
         int WriteCredit(int newCredit, bool doppelt);
         String ID();
-        void newRead();
+        bool newRead(unsigned long timeoutMs = 15000UL);
+        bool IsSupportedTagType();
 
         bool loadConfiguration();
         bool saveConfiguration(int tiSingle, int tiDobule);
@@ -94,6 +95,8 @@ private:
         static volatile bool KeyBoth;
 
         static volatile unsigned long debounce;
+        static volatile unsigned long lastLeftInterrupt;
+        static volatile unsigned long lastRightInterrupt;
 };
 
 #endif
