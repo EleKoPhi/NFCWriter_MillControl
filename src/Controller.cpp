@@ -4,6 +4,104 @@
 #include "Controller.h"
 #include "Controller_defines.h"
 #include <SPI.h>
+#include "LogManager.h"
+#include "MillWiFi.h"
+#include <esp_attr.h>
+#include <esp_system.h>
+#include <Preferences.h>
+
+namespace
+{
+        static const uint32_t PULL_RECOVERY_MAGIC = 0x504C4C31UL; // "PLL1"
+        static const char *RESET_STATS_NS = "reset_stats";
+        static const char *RESET_STATS_KEY_WITH_PULL = "with_pull";
+        static const char *RESET_STATS_KEY_WITHOUT_PULL = "no_pull";
+        static const int PAY_RESULT_LOW_CREDIT = -2;
+        static const int PAY_RESULT_WRITE_FAILED = -3;
+        static const int PAY_RESULT_CARD_MISMATCH = -4;
+
+        struct PendingPullRtcData
+        {
+                uint32_t magic;
+                uint32_t durationMs;
+                uint32_t crc;
+                uint8_t active;
+                char state;
+        };
+
+        RTC_DATA_ATTR PendingPullRtcData g_pendingPullRtc = {0, 0, 0, 0, WaitForUser};
+
+        static uint32_t pendingPullRtcCrc(const PendingPullRtcData &data)
+        {
+                return data.magic ^ data.durationMs ^ (uint32_t)data.active ^ (uint32_t)(uint8_t)data.state ^ 0xA5A55A5AUL;
+        }
+
+        static bool hasValidPendingPullSnapshot()
+        {
+                return g_pendingPullRtc.magic == PULL_RECOVERY_MAGIC
+                        && g_pendingPullRtc.crc == pendingPullRtcCrc(g_pendingPullRtc)
+                        && g_pendingPullRtc.active != 0
+                        && g_pendingPullRtc.durationMs != 0
+                        && (g_pendingPullRtc.state == Single || g_pendingPullRtc.state == Double);
+        }
+
+        static bool shouldCountResetReason(esp_reset_reason_t reason)
+        {
+                switch (reason)
+                {
+                case ESP_RST_UNKNOWN:
+                case ESP_RST_POWERON:
+                case ESP_RST_DEEPSLEEP:
+                        return false;
+                default:
+                        return true;
+                }
+        }
+
+        static void recordResetCounters()
+        {
+                esp_reset_reason_t reason = esp_reset_reason();
+                if (!shouldCountResetReason(reason))
+                        return;
+
+                bool interruptedPull = hasValidPendingPullSnapshot();
+                Preferences prefs;
+                prefs.begin(RESET_STATS_NS, false);
+
+                uint32_t withPull = prefs.getULong(RESET_STATS_KEY_WITH_PULL, 0);
+                uint32_t withoutPull = prefs.getULong(RESET_STATS_KEY_WITHOUT_PULL, 0);
+
+                if (interruptedPull)
+                {
+                        withPull++;
+                        prefs.putULong(RESET_STATS_KEY_WITH_PULL, withPull);
+                }
+                else
+                {
+                        withoutPull++;
+                        prefs.putULong(RESET_STATS_KEY_WITHOUT_PULL, withoutPull);
+                }
+
+                prefs.end();
+
+                Serial.println(
+                        "[ResetStats] reason=" + String((int)reason)
+                        + " interrupted_pull=" + String(interruptedPull ? 1 : 0)
+                        + " with_pull=" + String(withPull)
+                        + " without_pull=" + String(withoutPull)
+                );
+        }
+}
+
+static void serviceNetworkDelay(unsigned long ms)
+{
+        unsigned long start = millis();
+        while ((millis() - start) < ms)
+        {
+                MillWiFi::getInstance().handle();
+                delay(1);
+        }
+}
 
 Controller::Controller(int chipSelect, int slaveSelect, int rstPin, int clk, int data) : MillDrawer(clk, data), MillUserHandler(chipSelect, slaveSelect, rstPin) {}
 
@@ -129,22 +227,146 @@ void Controller::SetProgress(int prog) { this->tempProgress = prog; }
 
 /////////////////////////////////////////////////////////////////////////////////
 
+bool Controller::IsSelectionReleased(char keyCode, unsigned long minHoldMs, unsigned long maxHoldMs)
+{
+        char currentInput = GetUserHandler().ReadUserInput();
+        unsigned long heldMs = 0;
+
+        if (keyCode == LEFT_KEY)
+        {
+                heldMs = GetTiLeft();
+        }
+        else if (keyCode == RIGHT_KEY)
+        {
+                heldMs = GetTiRight();
+        }
+        else
+        {
+                return false;
+        }
+
+        if (GetCurrentKeyFlag() != keyCode || currentInput == keyCode || heldMs < minHoldMs)
+        {
+                return false;
+        }
+        if (maxHoldMs > 0 && heldMs >= maxHoldMs)
+        {
+                return false;
+        }
+        return true;
+}
+
+bool Controller::IsSelectionPressed(char keyCode, unsigned long minHoldMs)
+{
+        char currentInput = GetUserHandler().ReadUserInput();
+        if (GetCurrentKeyFlag() != keyCode || currentInput != keyCode)
+        {
+                return false;
+        }
+
+        if (keyCode == LEFT_KEY)
+        {
+                return GetTiLeft() >= minHoldMs;
+        }
+        if (keyCode == RIGHT_KEY)
+        {
+                return GetTiRight() >= minHoldMs;
+        }
+        return false;
+}
+
+bool Controller::WriteCreditWithRetry(int targetCredit, bool paymentType)
+{
+        int status = FAILED;
+        for (int attempt = 0; attempt <= ERROR_RETRY_WRITING; attempt++)
+        {
+                status = GetUserHandler().WriteCredit(targetCredit, paymentType);
+                if (status == _Ok)
+                {
+                        return true;
+                }
+                MillWiFi::getInstance().handle();
+                delay(1);
+        }
+        return false;
+}
+
+int Controller::DebitPresentedCard(int price, bool paymentType, int &creditAfter)
+{
+        int credit = GetUserHandler().ReadCredit();
+        creditAfter = INVALD_CREDIT;
+
+        if (credit == INVALD_CREDIT)
+        {
+                return INVALD_CREDIT;
+        }
+
+        if (credit < price)
+        {
+                return PAY_RESULT_LOW_CREDIT;
+        }
+
+        creditAfter = credit - price;
+        if (!WriteCreditWithRetry(creditAfter, paymentType))
+        {
+                return PAY_RESULT_WRITE_FAILED;
+        }
+
+        GetUserHandler().WriteToLog(-price, creditAfter);
+        return _Ok;
+}
+
+int Controller::RefundPresentedCard(String expectedUser, int refundCredits, int &creditAfter)
+{
+        String currentUser = GetUserHandler().GetCardId();
+        currentUser.trim();
+        expectedUser.trim();
+        creditAfter = INVALD_CREDIT;
+
+        if (expectedUser == ZERO_STRING || expectedUser == "" || currentUser != expectedUser)
+        {
+                return PAY_RESULT_CARD_MISMATCH;
+        }
+
+        int credit = GetUserHandler().ReadCredit();
+        if (credit == INVALD_CREDIT || credit + refundCredits > 255)
+        {
+                return INVALD_CREDIT;
+        }
+
+        creditAfter = credit + refundCredits;
+        if (!WriteCreditWithRetry(creditAfter, false))
+        {
+                return PAY_RESULT_WRITE_FAILED;
+        }
+
+        GetUserHandler().WriteToLog(+refundCredits, creditAfter);
+        return _Ok;
+}
+
 char Controller::tr_WaitForUser()
 {
-        if (GetCurrentKeyFlag() == LEFT_KEY && GetUserHandler().ReadUserInput() != LEFT_KEY)
+        bool leftSelectionReleased = IsSelectionReleased(LEFT_KEY, PAYMENT_SELECTION_HOLD_MS, TIME_FOR_PW_ACTIVATION);
+        bool rightSelectionReleased = IsSelectionReleased(RIGHT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool leftSelectionPressed = IsSelectionPressed(LEFT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool rightSelectionPressed = IsSelectionPressed(RIGHT_KEY, PAYMENT_SELECTION_HOLD_MS);
+
+        if (GetTiLeft() > TIME_FOR_PW_ACTIVATION)
+        {
+                MillWiFi::getInstance().activateFor(WIFI_AP_ACTIVE_MS);
+                return StateBegin(EnterKey);
+        }
+        else if (leftSelectionReleased || leftSelectionPressed)
         {
                 return StateBegin(PayOne);
         }
-        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        else if (rightSelectionReleased || rightSelectionPressed)
         {
-                if (GetUserHandler().config.split == 1)
-                {
-                        return StateBegin(AskForSplitPayment);
-                }
-                else
-                {
-                        return StateBegin(PayTwo);
-                }
+#ifdef SPLIT_ENABLED
+                return StateBegin(AskForSplitPayment);
+#else
+                return StateBegin(PayTwo);
+#endif
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
@@ -153,10 +375,6 @@ char Controller::tr_WaitForUser()
         else if (GetUserHandler().HasCardToRead())
         {
                 return StateBegin(ReadCreditUser);
-        }
-        else if (GetTiLeft() > TIME_FOR_PW_ACTIVATION)
-        {
-                return StateBegin(EnterKey);
         }
         else if (GetTimeDelta() > DELAY_ACTIVATION_SCREENSAFTER)
         {
@@ -221,13 +439,22 @@ char Controller::tr_SelectToToAdapt()
 }
 char Controller::tr_ShowCredit()
 {
-        if (GetCurrentKeyFlag() == LEFT_KEY)
+        bool leftSelectionReleased = IsSelectionReleased(LEFT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool rightSelectionReleased = IsSelectionReleased(RIGHT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool leftSelectionPressed = IsSelectionPressed(LEFT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool rightSelectionPressed = IsSelectionPressed(RIGHT_KEY, PAYMENT_SELECTION_HOLD_MS);
+
+        if (leftSelectionReleased || leftSelectionPressed)
         {
                 return StateBegin(PayOne);
         }
-        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        else if (rightSelectionReleased || rightSelectionPressed)
         {
+#ifdef SPLIT_ENABLED
                 return StateBegin(AskForSplitPayment);
+#else
+                return StateBegin(PayTwo);
+#endif
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
@@ -244,13 +471,22 @@ char Controller::tr_ShowCredit()
 }
 char Controller::tr_ShowLastUser()
 {
-        if (GetCurrentKeyFlag() == LEFT_KEY)
+        bool leftSelectionReleased = IsSelectionReleased(LEFT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool rightSelectionReleased = IsSelectionReleased(RIGHT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool leftSelectionPressed = IsSelectionPressed(LEFT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool rightSelectionPressed = IsSelectionPressed(RIGHT_KEY, PAYMENT_SELECTION_HOLD_MS);
+
+        if (leftSelectionReleased || leftSelectionPressed)
         {
                 return StateBegin(PayOne);
         }
-        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        else if (rightSelectionReleased || rightSelectionPressed)
         {
+#ifdef SPLIT_ENABLED
                 return StateBegin(AskForSplitPayment);
+#else
+                return StateBegin(PayTwo);
+#endif
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
@@ -288,15 +524,22 @@ char Controller::tr_NVMError()
 
 char Controller::tr_Screensafer()
 {
-        SetStartTime(millis());
+        bool leftSelectionReleased = IsSelectionReleased(LEFT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool rightSelectionReleased = IsSelectionReleased(RIGHT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool leftSelectionPressed = IsSelectionPressed(LEFT_KEY, PAYMENT_SELECTION_HOLD_MS);
+        bool rightSelectionPressed = IsSelectionPressed(RIGHT_KEY, PAYMENT_SELECTION_HOLD_MS);
 
-        if (GetCurrentKeyFlag() == LEFT_KEY)
+        if (leftSelectionReleased || leftSelectionPressed)
         {
                 return StateBegin(PayOne);
         }
-        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        else if (rightSelectionReleased || rightSelectionPressed)
         {
+#ifdef SPLIT_ENABLED
                 return StateBegin(AskForSplitPayment);
+#else
+                return StateBegin(PayTwo);
+#endif
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
@@ -313,7 +556,10 @@ char Controller::tr_Screensafer()
 }
 char Controller::tr_Single()
 {
-        if (GetCurrentKeyFlag() == LEFT_KEY)
+        bool stopLeftRequested = GetTiLeft() >= STOP_MENU_HOLD_MS && GetUserHandler().ReadUserInput() == LEFT_KEY;
+        bool stopRightRequested = GetTiRight() >= STOP_MENU_HOLD_MS && GetUserHandler().ReadUserInput() == RIGHT_KEY;
+
+        if (GetTimeDelta() > STOP_INPUT_GUARD_MS && stopLeftRequested)
         {
                 SetTimeRemaning(GetTimeSingle());
                 SetTimePassed(GetTimeDelta());
@@ -322,7 +568,7 @@ char Controller::tr_Single()
                 MillOff();
                 return StateBegin(StopState);
         }
-        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        else if (GetTimeDelta() > STOP_INPUT_GUARD_MS && stopRightRequested)
         {
                 SetTimeRemaning(GetTimeSingle());
                 SetTimePassed(GetTimeDelta());
@@ -338,7 +584,10 @@ char Controller::tr_Single()
 }
 char Controller::tr_Dobule()
 {
-        if (GetCurrentKeyFlag() == LEFT_KEY)
+        bool stopLeftRequested = GetTiLeft() >= STOP_MENU_HOLD_MS && GetUserHandler().ReadUserInput() == LEFT_KEY;
+        bool stopRightRequested = GetTiRight() >= STOP_MENU_HOLD_MS && GetUserHandler().ReadUserInput() == RIGHT_KEY;
+
+        if (GetTimeDelta() > STOP_INPUT_GUARD_MS && stopLeftRequested)
         {
                 SetTimeRemaning(GetTimeDouble());
                 SetTimePassed(GetTimeDelta());
@@ -347,7 +596,7 @@ char Controller::tr_Dobule()
                 MillOff();
                 return StateBegin(StopState);
         }
-        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        else if (GetTimeDelta() > STOP_INPUT_GUARD_MS && stopRightRequested)
         {
                 SetTimeRemaning(GetTimeDouble());
                 SetTimePassed(GetTimeDelta());
@@ -363,7 +612,10 @@ char Controller::tr_Dobule()
 }
 char Controller::tr_FinishState()
 {
-        if (GetCurrentKeyFlag() == LEFT_KEY)
+        bool stopLeftRequested = GetTiLeft() >= STOP_MENU_HOLD_MS && GetUserHandler().ReadUserInput() == LEFT_KEY;
+        bool stopRightRequested = GetTiRight() >= STOP_MENU_HOLD_MS && GetUserHandler().ReadUserInput() == RIGHT_KEY;
+
+        if (GetTimeDelta() > STOP_INPUT_GUARD_MS && stopLeftRequested)
         {
                 SetTimePassed(GetTimeDelta() + GetTimePassed());
                 SetTimeStopBegin(millis());
@@ -371,7 +623,7 @@ char Controller::tr_FinishState()
                 MillOff();
                 return StateBegin(StopState);
         }
-        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        else if (GetTimeDelta() > STOP_INPUT_GUARD_MS && stopRightRequested)
         {
                 SetTimePassed(GetTimeDelta() + GetTimePassed());
                 SetTimeStopBegin(millis());
@@ -386,13 +638,20 @@ char Controller::tr_FinishState()
 }
 char Controller::tr_StopState()
 {
-        if (GetCurrentKeyFlag() == LEFT_KEY)
+        char actionKey = GetCurrentKeyFlag();
+        if (actionKey == NONE_KEY)
+        {
+                actionKey = GetUserHandler().ReadUserInput();
+        }
+
+        if (actionKey == LEFT_KEY)
         {
                 SetTimeInStop(NO_TIME);
                 SetTimeStopBegin(NO_TIME);
+                ClearPendingPull();
                 return StateBegin(WaitForUser);
         }
-        else if (GetCurrentKeyFlag() == RIGHT_KEY)
+        else if (actionKey == RIGHT_KEY)
         {
                 MillOn();
                 return StateBegin(FinishState);
@@ -423,6 +682,7 @@ char Controller::tr_FreePullState()
                 return GetCurrentStatus();
         }
 }
+#ifdef SPLIT_ENABLED
 char Controller::tr_AskForSplitPayment()
 {
         if (GetCurrentKeyFlag() == LEFT_KEY)
@@ -442,8 +702,11 @@ char Controller::tr_AskForSplitPayment()
                 return GetCurrentStatus();
         }
 }
+#endif  // SPLIT_ENABLED
 char Controller::tr_ReadCreditUser()
 {
+        //SetUserAsInt(GetUserHandler().GetCardId().toInt());
+        //SetCreditAsInt(GetUserHandler().ReadCredit());
         return StateBegin(ShowCredit);
 }
 char Controller::tr_AdaptTiDouble()
@@ -513,57 +776,40 @@ char Controller::tr_PayOne()
 {
         if (GetUserHandler().HasCardToRead())
         {
-                int _credit = GetUserHandler().ReadCredit();
-                int _status = DEFAULT_INT_INI;
-                int _counter = DEFAULT_INT_INI;
+                int creditAfter = INVALD_CREDIT;
+                int status = DebitPresentedCard(PRICE_SINGE, false, creditAfter);
 
-                if (_credit == INVALD_CREDIT)
+                if (status == INVALD_CREDIT)
                 {
                         return StateBegin(PayOne);
                 }
 
-                if (_credit >= PRICE_SINGE)
+                if (status == _Ok)
                 {
-                        _status = GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
-
-                        if (_status == _Ok)
-                        {
-                                delay(DELAY_MILL_ON);
-                                MillOn();
-                                return StateBegin(Single);
-                        }
-                        else
-                        {
-                                while ((_status != _Ok) && (_counter <= ERROR_RETRY_WRITING))
-                                {
-                                        _status = GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
-                                        if (_status == _Ok)
-                                                break;
-                                        _counter++;
-                                }
-
-                                if (_counter >= ERROR_RETRY_WRITING)
-                                {
-                                        GetDrawer().DrawSystemError();
-                                        delay(DELAY_AFTER_ERROR);
-                                        return StateBegin(WaitForUser);
-                                }
-                                else
-                                {
-                                        delay(DELAY_MILL_ON);
-                                        MillOn();
-                                        return StateBegin(Single);
-                                }
-                        }
+                        SavePendingPull(Single, GetTimeSingle());
+                        serviceNetworkDelay(DELAY_MILL_ON);
+                        MillOn();
+                        return StateBegin(Single);
                 }
-                else
+
+                if (status == PAY_RESULT_LOW_CREDIT)
                 {
                         return StateBegin(LowCredit);
                 }
+
+                GetDrawer().DrawSystemError();
+                serviceNetworkDelay(DELAY_AFTER_ERROR);
+                ClearPendingPull();
+                return StateBegin(WaitForUser);
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
                 return StateBegin(WaitForUser);
+        }
+        else if (GetTiLeft() > TIME_FOR_PW_ACTIVATION && GetUserHandler().ReadUserInput() == LEFT_KEY)
+        {
+                MillWiFi::getInstance().activateFor(WIFI_AP_ACTIVE_MS);
+                return StateBegin(EnterKey);
         }
         else
         {
@@ -574,53 +820,31 @@ char Controller::tr_PayTwo()
 {
         if (GetUserHandler().HasCardToRead())
         {
-                int _credit = GetUserHandler().ReadCredit();
-                int _status = DEFAULT_INT_INI;
-                int _counter = DEFAULT_INT_INI;
+                int creditAfter = INVALD_CREDIT;
+                int status = DebitPresentedCard(PRICE_DOUBLE, true, creditAfter);
 
-                if (_credit == INVALD_CREDIT)
+                if (status == INVALD_CREDIT)
                 {
                         return StateBegin(WaitForUser);
                 }
 
-                if (_credit >= PRICE_DOUBLE)
+                if (status == _Ok)
                 {
-                        _status = GetUserHandler().WriteCredit(_credit - PRICE_DOUBLE, true);
-
-                        if (_status == _Ok)
-                        {
-                                delay(DELAY_MILL_ON);
-                                MillOn();
-                                return StateBegin(Double);
-                        }
-                        else
-                        {
-                                while ((_status != _Ok) && (_counter <= ERROR_RETRY_WRITING))
-                                {
-                                        _status = GetUserHandler().WriteCredit(_credit - PRICE_DOUBLE, true);
-                                        if (_status == _Ok)
-                                                break;
-                                        _counter++;
-                                }
-
-                                if (_counter >= ERROR_RETRY_WRITING)
-                                {
-                                        GetDrawer().DrawSystemError();
-                                        delay(DELAY_AFTER_ERROR);
-                                        return StateBegin(WaitForUser);
-                                }
-                                else
-                                {
-                                        delay(DELAY_MILL_ON);
-                                        MillOn();
-                                        return StateBegin(Double);
-                                }
-                        }
+                        SavePendingPull(Double, GetTimeDouble());
+                        serviceNetworkDelay(DELAY_MILL_ON);
+                        MillOn();
+                        return StateBegin(Double);
                 }
-                else
+
+                if (status == PAY_RESULT_LOW_CREDIT)
                 {
                         return StateBegin(LowCredit);
                 }
+
+                GetDrawer().DrawSystemError();
+                serviceNetworkDelay(DELAY_AFTER_ERROR);
+                ClearPendingPull();
+                return StateBegin(WaitForUser);
         }
         else if (GetCurrentKeyFlag() == BOTH_KEY)
         {
@@ -631,6 +855,7 @@ char Controller::tr_PayTwo()
                 return GetCurrentStatus();
         }
 }
+#ifdef SPLIT_ENABLED
 char Controller::tr_PayTwo_1()
 {
         if (GetUserHandler().HasCardToRead())
@@ -644,13 +869,22 @@ char Controller::tr_PayTwo_1()
 
                 if (_credit >= PRICE_SINGE)
                 {
-                        MillUserHandler.WriteCredit(_credit - PRICE_SINGE, false);
-                        MillUserHandler.newRead();
-                        while (GetCurrentUser() == ZERO_STRING || GetCurrentUser() == "")
+                        String firstUser = GetUserHandler().GetCardId();
+                        int creditAfter = INVALD_CREDIT;
+                        int status = DebitPresentedCard(PRICE_SINGE, false, creditAfter);
+                        if (status != _Ok)
                         {
-                                SetCurrentUser(GetUserHandler().GetCardId());
-                                GetUserHandler().ReadCredit();
+                                if (status == PAY_RESULT_LOW_CREDIT)
+                                {
+                                        return StateBegin(LowCredit);
+                                }
+                                GetDrawer().DrawSystemError();
+                                serviceNetworkDelay(DELAY_AFTER_ERROR);
+                                return StateBegin(WaitForUser);
                         }
+                        SetCurrentUser(firstUser);
+                        if (!MillUserHandler.newRead(15000UL))
+                                return StateBegin(RepayState);
                         return StateBegin(PayTwo_2);
                 }
                 else
@@ -673,14 +907,24 @@ char Controller::tr_PayTwo_2()
         {
 
                 String _currentUser = GetUserHandler().GetCardId();
-                int _credit = GetUserHandler().ReadCredit();
+                int creditAfter = INVALD_CREDIT;
 
-                if ((_credit >= PRICE_SINGE) && (GetCurrentUser() != _currentUser) && (_currentUser != ZERO_STRING))
+                if ((GetCurrentUser() != _currentUser) && (_currentUser != ZERO_STRING))
                 {
-                        GetUserHandler().WriteCredit(_credit - PRICE_SINGE, false);
-                        delay(DELAY_MILL_ON);
-                        MillOn();
-                        return StateBegin(Double);
+                        int status = DebitPresentedCard(PRICE_SINGE, false, creditAfter);
+                        if (status == _Ok)
+                        {
+                                serviceNetworkDelay(DELAY_MILL_ON);
+                                MillOn();
+                                return StateBegin(Double);
+                        }
+                        if (status == PAY_RESULT_LOW_CREDIT)
+                        {
+                                return StateBegin(LowCredit);
+                        }
+                        GetDrawer().DrawSystemError();
+                        serviceNetworkDelay(DELAY_AFTER_ERROR);
+                        return StateBegin(RepayState);
                 }
                 else
                 {
@@ -700,23 +944,25 @@ char Controller::tr_RepayState()
 {
         if (GetUserHandler().HasCardToRead())
         {
-                String _currentUser = GetUserHandler().GetCardId();
-                int _credit = GetUserHandler().ReadCredit();
-                if (_credit == INVALD_CREDIT)
+                int creditAfter = INVALD_CREDIT;
+                int status = RefundPresentedCard(GetCurrentUser(), PRICE_SINGE, creditAfter);
+                if (status == INVALD_CREDIT)
                 {
                         return StateBegin(RepayState);
                 }
-                else
+                else if (status == _Ok)
                 {
-                        GetUserHandler().WriteCredit(_credit + PRICE_SINGE, false);
+                        SetCurrentUser("");
                         return StateBegin(DoneState);
                 }
+                return StateBegin(RepayState);
         }
         else
         {
                 return GetCurrentStatus();
         }
 }
+#endif  // SPLIT_ENABLED
 char Controller::tr_DoneState()
 {
         if (!(GetUserHandler().HasCardToRead()))
@@ -738,6 +984,11 @@ char Controller::tr_DoneState()
 
 void Controller::Begin()
 {
+        Serial.println("[Boot] reset reason=" + String((int)esp_reset_reason()));
+        recordResetCounters();
+
+        GetDrawer().Begin();
+
         // Initialize all variables with default values
         Reset();
 
@@ -767,8 +1018,11 @@ void Controller::Begin()
         // Setup watchdog time to 2s. One cycle is around 30ms
         // GetWatchDog().setup(WDT_HARDCYCLE2S);
 
-        // Draw initial screen
-        SetUpdateDisplay(true);
+        if (!RestorePendingPull())
+        {
+                // Draw initial screen
+                SetUpdateDisplay(true);
+        }
 }
 
 void Controller::ProcessInput()
@@ -836,6 +1090,7 @@ char Controller::StateTransitions()
         if ((millis() - GetTimer50ms()) > TASK_50MS)
         {
                 SetTimer50ms(millis());
+                ProcessInput();
 
                 switch (GetCurrentStatus())
                 {
@@ -859,8 +1114,10 @@ char Controller::StateTransitions()
                         return (tr_StopState());
                 case FreePullState:
                         return (tr_FreePullState());
+#ifdef SPLIT_ENABLED
                 case AskForSplitPayment:
                         return (tr_AskForSplitPayment());
+#endif
                 case ReadCreditUser:
                         return (tr_ReadCreditUser());
                 case AdaptTiSingle:
@@ -871,12 +1128,14 @@ char Controller::StateTransitions()
                         return (tr_PayOne());
                 case PayTwo:
                         return (tr_PayTwo());
+#ifdef SPLIT_ENABLED
                 case PayTwo_1:
                         return (tr_PayTwo_1());
                 case PayTwo_2:
                         return (tr_PayTwo_2());
                 case RepayState:
                         return (tr_RepayState());
+#endif
                 case DoneState:
                         return (tr_DoneState());
                 case ShowLastUser:
@@ -897,6 +1156,7 @@ bool Controller::TimeOut(unsigned long time)
 {
         if (tiDelat >= time)
         {
+                ClearPendingPull();
                 this->Reset();
                 return true;
         }
@@ -924,8 +1184,6 @@ void Controller::States(char state)
         if ((millis() - GetTimer100ms()) > TASK_100MS)
         {
                 SetTimer100ms(millis());
-
-                ProcessInput();
 
                 if (state == WaitForUser)
                 {
@@ -1060,6 +1318,7 @@ void Controller::States(char state)
                         GetDrawer().DrawScreenSafer(millis());
                 }
 
+#ifdef SPLIT_ENABLED
                 else if (state == AskForSplitPayment)
                 {
                         if (GetUpdateDisplay())
@@ -1069,6 +1328,7 @@ void Controller::States(char state)
                         }
                         TimeOut(TIMEOUT_DEFAULT);
                 }
+#endif
 
                 else if (state == SelectTiToAdapt)
                 {
@@ -1090,6 +1350,7 @@ void Controller::States(char state)
                         TimeOut(TIMEOUT_DEFAULT);
                 }
 
+#ifdef SPLIT_ENABLED
                 else if (state == PayTwo_1)
                 {
                         if (GetUpdateDisplay())
@@ -1109,6 +1370,7 @@ void Controller::States(char state)
                         }
                         TimeOutWithBackPay(TIMEOUT_LONG);
                 }
+#endif
 
                 else if (state == LowCredit)
                 {
@@ -1122,6 +1384,8 @@ void Controller::States(char state)
 
                 else if (state == ReadCreditUser)
                 {
+                        // Credit and ID are captured in tr_ReadCreditUser to avoid timing races
+                        // between 50ms transition ticks and 100ms display ticks.
                         SetUserAsInt(GetUserHandler().GetCardId().toInt());
                         SetCreditAsInt(GetUserHandler().ReadCredit());
                 }
@@ -1140,11 +1404,13 @@ void Controller::States(char state)
                         }
                         TimeOut(TIMEOUT_SHORT);
                 }
+#ifdef SPLIT_ENABLED
                 else if (state == RepayState)
                 {
                         GetDrawer().DrawReplay(GetTimeDelta() / (TIMEOUT_REPAY / HUNDRED_PERCENT));
                         TimeOut(TIMEOUT_REPAY);
                 }
+#endif
                 else if (state == DoneState)
                 {
                         if (GetUpdateDisplay())
@@ -1196,6 +1462,7 @@ void Controller::States(char state)
 
 void Controller::Reset()
 {
+        pendingPullActive = false;
         MillOff();
         SetCurrentStatus(WaitForUser);
         SetTimeDelta(0);
@@ -1232,4 +1499,78 @@ void Controller::MillOn()
 void Controller::MillOff()
 {
         digitalWrite(RelayPin, LOW);
+}
+
+void Controller::SavePendingPull(char state, unsigned long durationMs)
+{
+        g_pendingPullRtc.magic = PULL_RECOVERY_MAGIC;
+        g_pendingPullRtc.durationMs = durationMs;
+        g_pendingPullRtc.active = 1;
+        g_pendingPullRtc.state = state;
+        g_pendingPullRtc.crc = pendingPullRtcCrc(g_pendingPullRtc);
+        pendingPullActive = true;
+}
+
+void Controller::ClearPendingPull()
+{
+        if (!pendingPullActive && g_pendingPullRtc.active == 0)
+                return;
+
+        g_pendingPullRtc.magic = 0;
+        g_pendingPullRtc.durationMs = 0;
+        g_pendingPullRtc.active = 0;
+        g_pendingPullRtc.state = WaitForUser;
+        g_pendingPullRtc.crc = pendingPullRtcCrc(g_pendingPullRtc);
+        pendingPullActive = false;
+}
+
+bool Controller::IsRecoverableResetReason(esp_reset_reason_t reason) const
+{
+        switch (reason)
+        {
+        case ESP_RST_BROWNOUT:
+        case ESP_RST_PANIC:
+        case ESP_RST_INT_WDT:
+        case ESP_RST_TASK_WDT:
+        case ESP_RST_WDT:
+                return true;
+        default:
+                return false;
+        }
+}
+
+bool Controller::RestorePendingPull()
+{
+        bool valid = g_pendingPullRtc.magic == PULL_RECOVERY_MAGIC
+                && g_pendingPullRtc.crc == pendingPullRtcCrc(g_pendingPullRtc);
+
+        pendingPullActive = valid && (g_pendingPullRtc.active != 0);
+        if (!pendingPullActive)
+                return false;
+
+        char state = g_pendingPullRtc.state;
+        unsigned long durationMs = g_pendingPullRtc.durationMs;
+        esp_reset_reason_t reason = esp_reset_reason();
+        Serial.println("[Recovery] pending pull found, reset reason=" + String((int)reason));
+
+        if (!IsRecoverableResetReason(reason) || durationMs == 0 || (state != Single && state != Double))
+        {
+                Serial.println("[Recovery] pending pull discarded");
+                ClearPendingPull();
+                return false;
+        }
+
+        SetDisplayedProgress(DEFAULT_INT_INI);
+        SetProgress(DEFAULT_INT_INI);
+        SetTimePassed(0);
+        SetTimeRemaning(durationMs);
+        SetCurrentStatus(FinishState);
+        SetCurrentKeyFlag(NONE_KEY);
+        SetOldKeyFlag(NONE_KEY);
+        SetTempKeyFlag(NONE_KEY);
+        SetStartTime(millis());
+        SetUpdateDisplay(true);
+        MillOn();
+        Serial.println("[Recovery] resuming interrupted pull");
+        return true;
 }

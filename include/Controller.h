@@ -5,6 +5,7 @@
 #include "UserHandler.h"
 #include "Drawer.h"
 #include <SPI.h>
+#include <esp_system.h>
 
 class Controller
 {
@@ -25,6 +26,11 @@ public:
     void Reset();
 
     void ProcessInput();
+    bool IsSelectionReleased(char keyCode, unsigned long minHoldMs, unsigned long maxHoldMs = 0);
+    bool IsSelectionPressed(char keyCode, unsigned long minHoldMs);
+    bool WriteCreditWithRetry(int targetCredit, bool paymentType);
+    int DebitPresentedCard(int price, bool paymentType, int &creditAfter);
+    int RefundPresentedCard(String expectedUser, int refundCredits, int &creditAfter);
 
     // State transitions
 
@@ -38,16 +44,18 @@ public:
     char tr_StopState();
     char tr_FinishState();
     char tr_FreePullState();
-    char tr_AskForSplitPayment();
     char tr_ReadCreditUser();
     char tr_AdaptTiSingle();
     char tr_AdaptTiDouble();
     char tr_PayOne();
     char tr_PayTwo();
+    char tr_DoneState();
+#ifdef SPLIT_ENABLED
+    char tr_AskForSplitPayment();
     char tr_PayTwo_1();
     char tr_PayTwo_2();
     char tr_RepayState();
-    char tr_DoneState();
+#endif
     char tr_ShowLastUser();
     char tr_NVMError();
 
@@ -55,6 +63,10 @@ public:
 
     void MillOn();
     void MillOff();
+    void SavePendingPull(char state, unsigned long durationMs);
+    void ClearPendingPull();
+    bool RestorePendingPull();
+    bool IsRecoverableResetReason(esp_reset_reason_t reason) const;
 
     // &Getter and Setter
 
@@ -195,6 +207,7 @@ private:
 
     unsigned long tiTimer100ms = 0;
     unsigned long tiTimer50ms = 0;
+    bool pendingPullActive = false;
 };
 
 #endif

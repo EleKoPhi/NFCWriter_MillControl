@@ -31,11 +31,13 @@ public:
         bool HasCardToRead();
         String GetCardId();
         String GetTimeStamp();
-        void WriteToLog(String userID, String credit, bool doppelt);
+        void WriteToLog(int8_t delta, int16_t creditAfter = -1);
+        void GetRawUID(uint8_t buf[7]);
         int ReadCredit();
         int WriteCredit(int newCredit, bool doppelt);
         String ID();
-        void newRead();
+        bool newRead(unsigned long timeoutMs = 15000UL);
+        bool IsSupportedTagType();
 
         bool loadConfiguration();
         bool saveConfiguration(int tiSingle, int tiDobule);
@@ -60,15 +62,15 @@ public:
         int &GetUserKey();
         void SetUserKey(int key);
 
-        static bool &GetStLeft();
+        static bool GetStLeft();
         static void SetStLeft(bool st);
-        static bool &GetStRigth();
+        static bool GetStRigth();
         static void SetStRight(bool st);
-        static bool &GetStBoth();
+        static bool GetStBoth();
         static void SetStBoth(bool st);
         static void ResetInput();
 
-        static unsigned long &GetTimer();
+        static unsigned long GetTimer();
         static void SetTimer(long ti);
 
         static void StartKeyDebounce();
@@ -88,11 +90,13 @@ private:
         bool NfcStatus;
         bool ConfigStatus;
 
-        static bool KeyLeft;
-        static bool KeyRight;
-        static bool KeyBoth;
+        static volatile bool KeyLeft;
+        static volatile bool KeyRight;
+        static volatile bool KeyBoth;
 
-        static unsigned long debounce;
+        static volatile unsigned long debounce;
+        static volatile unsigned long lastLeftInterrupt;
+        static volatile unsigned long lastRightInterrupt;
 };
 
 #endif

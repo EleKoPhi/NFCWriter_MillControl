@@ -2,6 +2,7 @@
 #include "Drawer.h"
 #include <U8g2lib.h>
 #include "Drawer_defines.h"
+#include "MillWiFi.h"
 
 #ifdef SIXTYFOUR
 U8G2_SSD1306_128X64_NONAME_F_SW_I2C &Drawer::GetDisplay() { return Screen; }
@@ -9,13 +10,23 @@ U8G2_SSD1306_128X64_NONAME_F_SW_I2C &Drawer::GetDisplay() { return Screen; }
 U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C &Drawer::GetDisplay() { return Screen; }
 #endif
 
-Drawer::Drawer(int clk, int data) : Screen(U8G2_R0, clk, data, U8X8_PIN_NONE)
+Drawer::Drawer(int clk, int data) : Screen(U8G2_R0, clk, data, U8X8_PIN_NONE), initialized(false)
 {
+}
+
+void Drawer::Begin()
+{
+        if (initialized)
+        {
+                return;
+        }
+
         GetDisplay().begin();
         GetDisplay().setFlipMode(TARGETFLIPMODE);
         SetScreensaverX(GetDisplay().getWidth() / 2);
         SetScreensaverY(GetDisplay().getHeight() / 2);
         SetScreensaverSize(SAFTERINITIALSIZE);
+        initialized = true;
 }
 
 int Drawer::GetScreensaverSize() { return size; }
@@ -30,13 +41,31 @@ void Drawer::SetOldTime(int time) { oldTime = time; }
 void Drawer::DrawClearDisplay()
 {
         GetDisplay().clearBuffer();
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawCenteredText(String txt, int y)
 {
         char _pos = (GetDisplay().getWidth() - GetDisplay().getStrWidth(txt.c_str())) / 2;
         GetDisplay().drawStr(_pos, y, txt.c_str());
+}
+
+void Drawer::DrawApActiveIndicator()
+{
+        uint16_t width = MillWiFi::getInstance().getActiveBarPixels(GetDisplay().getWidth());
+        if (width == 0)
+        {
+                return;
+        }
+
+        int y = GetDisplay().getHeight() - 1;
+        GetDisplay().drawHLine(0, y, width);
+}
+
+void Drawer::SendBuffer()
+{
+        DrawApActiveIndicator();
+        GetDisplay().sendBuffer();
 }
 
 void Drawer::DrawScreenSafer(int time)
@@ -50,7 +79,7 @@ void Drawer::DrawScreenSafer(int time)
                 SetOldTime(time);
         }
         GetDisplay().drawCircle(GetScreensaverX(), GetScreensaverY(), GetScreensaverSize());
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawStartUpAnimation()
@@ -67,7 +96,7 @@ void Drawer::DrawStartUpAnimation()
                 GetDisplay().setDrawColor(0);
                 GetDisplay().drawBox(0, 0, GetDisplay().getWidth() - pos, GetDisplay().getWidth() / 2);
                 GetDisplay().drawBox(GetDisplay().getWidth() + pos, 0, GetDisplay().getWidth() - pos, GetDisplay().getWidth() / 2);
-                GetDisplay().sendBuffer();
+                SendBuffer();
                 GetDisplay().setDrawColor(1);
                 pos = pos + STEPSIZE;
         }
@@ -99,7 +128,7 @@ void Drawer::DrawLastUser(String lastUser)
         DrawCenteredText(LASTID_txt, LASTID_y);
         GetDisplay().setFont(LASTID_value_font);
         DrawCenteredText(lastUser, LASTID_value_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawProgress(int progress)
@@ -113,7 +142,7 @@ void Drawer::DrawProgress(int progress)
         {
                 GetDisplay().drawBox(i * 13 + 1, PROGRESS_y, PROGRESS_width, PROGRESS_height);
         }
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawUnknown()
@@ -123,7 +152,7 @@ void Drawer::DrawUnknown()
         DrawCenteredText(UNKNOWNIDFILL_txt, UNKNOWNIDFILL_y1);
         DrawCenteredText(UNKNOWNID_txt, UNKNOWNID_y);
         DrawCenteredText(UNKNOWNIDFILL_txt, UNKNOWNIDFILL_y2);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawWaitForUser()
@@ -133,7 +162,7 @@ void Drawer::DrawWaitForUser()
         DrawCenteredText(BITTEWAEHLEN_txt, BITTEWAEHLEN_y);
         GetDisplay().setFont(ARROWS_font);
         DrawCenteredText(ARROWS_txt, ARROWS_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawPayOne()
@@ -143,7 +172,7 @@ void Drawer::DrawPayOne()
         DrawCenteredText(PAYONE_txt, PAYONE_y);
         GetDisplay().setFont(ADDCARD_font);
         DrawCenteredText(ADDCARD_txt, ADDCARD_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawSplitQuestion()
@@ -153,7 +182,7 @@ void Drawer::DrawSplitQuestion()
         DrawCenteredText(SPLITQ_txt, SPLITQ_y);
         GetDisplay().setFont(SPLITQARRWOS_font);
         DrawCenteredText(SPLITQARROWS_txt, SPLITQARROWS_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawPayTwo()
@@ -163,7 +192,7 @@ void Drawer::DrawPayTwo()
         DrawCenteredText(PAY2_txt, PAY2_y);
         GetDisplay().setFont(ADDCARD_font);
         DrawCenteredText(ADDCARD_txt, ADDCARD_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawPayTwo_First()
@@ -173,7 +202,7 @@ void Drawer::DrawPayTwo_First()
         DrawCenteredText(PAY2_1_txt, PAY2_1_y);
         GetDisplay().setFont(ADD1CARD_font);
         DrawCenteredText(ADD1CARD_y, ADD1CARD_txt);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawPayTwo_Second()
@@ -183,7 +212,7 @@ void Drawer::DrawPayTwo_Second()
         DrawCenteredText(PAY2_2_txt, PAY2_2_y);
         GetDisplay().setFont(ADD2CARD_font);
         DrawCenteredText(ADD2CARD_txt, ADD2CARD_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawLowCredit()
@@ -193,7 +222,7 @@ void Drawer::DrawLowCredit()
         DrawCenteredText(LOWCREDIT1_txt, LOWCREDIT1_y);
         GetDisplay().setFont(LOWCREDIT2_font);
         DrawCenteredText(LOWCREDIT2_txt, LOWCREDIT2_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawReplay(int progress)
@@ -205,7 +234,7 @@ void Drawer::DrawReplay(int progress)
         DrawCenteredText(REPAY2_txt, REPAY2_y);
         GetDisplay().drawLine(0, GetDisplay().getHeight() / 2 + 1, GetDisplay().getWidth() * ((progress) * 0.01), GetDisplay().getHeight() / 2 + 1);
         GetDisplay().drawLine(GetDisplay().getWidth(), GetDisplay().getHeight() / 2 - 1, (GetDisplay().getWidth() - GetDisplay().getWidth() * ((progress) * 0.01)), GetDisplay().getHeight() / 2 - 1);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawCredit(int ID, int Credit)
@@ -218,7 +247,7 @@ void Drawer::DrawCredit(int ID, int Credit)
         DrawCenteredText(_id, ID_y);
         GetDisplay().setFont(CREDITS_font);
         DrawCenteredText(_credit, CREDITS_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawDoneState()
@@ -226,7 +255,7 @@ void Drawer::DrawDoneState()
         GetDisplay().clearBuffer();
         GetDisplay().setFont(DONE_font);
         DrawCenteredText(DONE_txt, DONE_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::Drawer::DrawSystemError()
@@ -234,7 +263,7 @@ void Drawer::Drawer::DrawSystemError()
         GetDisplay().clearBuffer();
         GetDisplay().setFont(ERR_font);
         DrawCenteredText(ERR_txt, ERR_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawFreeState()
@@ -243,7 +272,7 @@ void Drawer::DrawFreeState()
         GetDisplay().setFont(FREE_font);
         DrawCenteredText(FREE1_txt, FREE1_y);
         DrawCenteredText(FREE2_txt, FREE2_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawStopState()
@@ -252,7 +281,7 @@ void Drawer::DrawStopState()
         GetDisplay().setFont(STOP_font);
         DrawCenteredText(STOP1_txt, STOP1_y);
         DrawCenteredText(STOP2_txt, STOP2_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawNvmErrorState()
@@ -261,7 +290,7 @@ void Drawer::DrawNvmErrorState()
         GetDisplay().setFont(NVM_Error_font);
         DrawCenteredText(NVM_ERROR_txt_1, NVM_ERROR_1_y);
         DrawCenteredText(NVM_ERROR_txt_2, NVM_ERROR_2_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawKeyInput(int actualKey, int activeKeyElement)
@@ -289,7 +318,7 @@ void Drawer::DrawKeyInput(int actualKey, int activeKeyElement)
         GetDisplay().setFont(KEY_FONT);
         DrawCenteredText(_key, KEY_y);
         DrawCenteredText(_selector, KEY_SELECTOR_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawSelectTime()
@@ -298,7 +327,7 @@ void Drawer::DrawSelectTime()
         GetDisplay().setFont(TIMESELECT_font);
         DrawCenteredText(DOPPELT_txt, DOPPELT_y);
         DrawCenteredText(EINFACH_txt, EINFACH_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }
 
 void Drawer::DrawTime(int time, bool type)
@@ -316,5 +345,5 @@ void Drawer::DrawTime(int time, bool type)
         }
 
         DrawCenteredText(String(time) + String(" ms"), TIME_VALUE_y);
-        GetDisplay().sendBuffer();
+        SendBuffer();
 }

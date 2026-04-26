@@ -9,8 +9,10 @@ class Drawer
 public:
     Drawer(int clk, int data);
 
+    void Begin();
     void DrawClearDisplay();
     void DrawCenteredText(String txt, int y);
+    void SendBuffer();
 
     void DrawStartUpAnimation();
     void DrawSystemStatus(bool nfcStatus);
@@ -52,6 +54,8 @@ public:
 #endif
 
 private:
+    void DrawApActiveIndicator();
+
 #ifdef SIXTYFOUR
     U8G2_SSD1306_128X64_NONAME_F_SW_I2C Screen;
 #else
@@ -62,6 +66,7 @@ private:
     int oldTime;
     int screensafer_x;
     int screensafer_y;
+    bool initialized;
 };
 
 #endif
